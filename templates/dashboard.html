@@ -1,0 +1,36 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}Dashboard | REUSE{% endblock %}
+{% block page %}dashboard{% endblock %}
+{% block clock %}<time class="clock" data-clock>MM/DD/YYYY | 00:00 AM</time>{% endblock %}
+
+{% block topbar_left %}
+  <h1 class="welcome">Welcome back, <span id="welcome-name"></span>!</h1>
+  <p class="welcome-sub">Here’s what’s happening with your REUSE activity.</p>
+{% endblock %}
+
+{% block content %}
+<section class="stat-grid" aria-label="Summary">
+  <a class="stat" href="{% url 'browse' %}"><span class="stat-label">Available items</span><strong id="stat-available">–</strong></a>
+  <a class="stat" href="{% url 'requests' %}"><span class="stat-label">My requests</span><strong id="stat-requests">–</strong></a>
+  <a class="stat" href="{% url 'borrowed' %}"><span class="stat-label">Active borrowings</span><strong id="stat-borrowings">–</strong></a>
+  <a class="stat" href="{% url 'notifications' %}"><span class="stat-label">Alerts</span><strong id="stat-alerts">–</strong></a>
+</section>
+
+<section class="panel" aria-labelledby="h-requests">
+  <div class="panel-head"><h2 id="h-requests">Recent Requests</h2><a href="{% url 'requests' %}">View all</a></div>
+  <div class="table-wrap" id="recent-requests"></div>
+</section>
+
+<section class="panel" aria-labelledby="h-returns">
+  <div class="panel-head"><h2 id="h-returns">Upcoming Returns</h2><a href="{% url 'returns' %}">View all</a></div>
+  <div class="table-wrap" id="upcoming-returns"></div>
+</section>
+
+<section class="panel" aria-labelledby="h-items">
+  <div class="panel-head"><h2 id="h-items">Recently Added Available Items</h2><a href="{% url 'browse' %}">View all</a></div>
+  <div class="table-wrap" id="recent-items"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'js/dashboard.js' %}"></script>{% endblock %}
