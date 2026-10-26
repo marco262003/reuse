@@ -1,0 +1,6 @@
+<div class="field" data-field="{{ name }}">
+  <input class="input" id="{{ name }}" name="{{ name }}" type="{{ type|default:'text' }}"
+         placeholder="{{ placeholder }}" aria-label="{{ placeholder }}" aria-describedby="{{ name }}-error"
+         autocomplete="{{ autocomplete|default:'off' }}"{% if inputmode %} inputmode="{{ inputmode }}"{% endif %}>
+  <p class="field-error" id="{{ name }}-error"></p>
+</div>

@@ -1,0 +1,13 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}My requests | REUSE{% endblock %}
+{% block page %}requests{% endblock %}
+{% block topbar_left %}
+  {% include "partials/search_filter.html" %}
+  <a class="btn btn-outline btn-sm" href="{% url 'browse' %}">+ New Request</a>
+{% endblock %}
+{% block content %}
+<h1 class="sr-only">My requests</h1>
+<div class="table-wrap table-wide" id="requests-table" aria-live="polite"></div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/requests.js' %}"></script>{% endblock %}

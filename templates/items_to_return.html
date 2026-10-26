@@ -1,0 +1,11 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}Items to return | REUSE{% endblock %}
+{% block page %}returns{% endblock %}
+{% block content %}
+<section class="stack" aria-labelledby="h-returns">
+  <h1 id="h-returns" class="section-tab">Items to Return</h1>
+  <div id="returns-grid" class="card-grid" aria-live="polite"></div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/returns.js' %}"></script>{% endblock %}

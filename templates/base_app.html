@@ -1,0 +1,60 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}REUSE{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="app" data-page="{% block page %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <aside class="sidebar">
+    <a class="brand" href="{% url 'dashboard' %}">REUSE</a>
+    {% block clock %}{% endblock %}
+    <nav class="nav" aria-label="Main">
+      <a href="{% url 'dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active" aria-current="page"{% endif %}>Dashboard</a>
+      <a href="{% url 'browse' %}" {% if request.resolver_match.url_name == 'browse' %}class="active" aria-current="page"{% endif %}>Browse Items</a>
+      <a href="{% url 'requests' %}" {% if request.resolver_match.url_name == 'requests' %}class="active" aria-current="page"{% endif %}>My Requests</a>
+      <a href="{% url 'borrowed' %}" {% if request.resolver_match.url_name == 'borrowed' %}class="active" aria-current="page"{% endif %}>Borrowed Items</a>
+      <a href="{% url 'returns' %}" {% if request.resolver_match.url_name == 'returns' %}class="active" aria-current="page"{% endif %}>Items to Return</a>
+    </nav>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <div class="topbar-left">{% block topbar_left %}{% endblock %}</div>
+      <div class="topbar-right">
+        <a class="bell {% if request.resolver_match.url_name == 'notifications' %}is-active{% endif %}" href="{% url 'notifications' %}" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7.5 2 7.5H4S6 15 6 9Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+          <span class="bell-badge" id="bell-badge" hidden></span>
+        </a>
+        <a class="profile-link {% if request.resolver_match.url_name == 'profile' %}is-active{% endif %}" href="{% url 'profile' %}" aria-label="My profile">
+          <span class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7Z"/></svg></span>
+          <span class="profile-name" id="user-name"></span>
+        </a>
+      </div>
+    </header>
+
+    <main id="main" class="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+
+  <script>
+    window.REUSE = window.REUSE || {};
+    REUSE.placeholder = "{% static 'img/placeholder.svg' %}";
+    REUSE.requireAuth = true;
+  </script>
+  <script src="{% static 'js/api.js' %}"></script>
+  <script src="{% static 'js/common.js' %}"></script>
+  <script src="{% static 'js/items-ui.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

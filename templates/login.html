@@ -1,0 +1,17 @@
+{% extends "base_auth.html" %}
+{% block title %}Log in | REUSE{% endblock %}
+{% block page %}login{% endblock %}
+{% block card %}
+<form id="login-form" novalidate>
+  {% include "partials/field.html" with name="email" type="email" placeholder="School Email" autocomplete="username" %}
+  {% include "partials/password_field.html" with name="password" placeholder="Password" autocomplete="current-password" %}
+  <div id="resend-wrap" class="resend" hidden>
+    <button type="button" id="resend-link" class="text-link">Resend verification link</button>
+  </div>
+  <div class="auth-links">
+    <a href="{% url 'reset_password' %}">Forgot password?</a>
+    <a href="{% url 'create_account' %}">Create an account</a>
+  </div>
+  <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Log in</button>
+</form>
+{% endblock %}

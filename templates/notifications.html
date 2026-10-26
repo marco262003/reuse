@@ -1,0 +1,12 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}Notifications | REUSE{% endblock %}
+{% block page %}notifications{% endblock %}
+{% block content %}
+<h1 class="page-title">Notifications</h1>
+<section class="card notes-card">
+  <div class="notes-head"><button type="button" class="btn btn-primary btn-sm" id="mark-all" disabled>Mark all as read</button></div>
+  <ul class="notes" id="notes" aria-live="polite"></ul>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/notifications.js' %}"></script>{% endblock %}

@@ -1,0 +1,14 @@
+<form class="search" role="search" onsubmit="return false">
+  <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+  <input type="search" id="search" placeholder="Search by item name" aria-label="Search by item name" autocomplete="off">
+  <button type="button" id="mic" class="mic" aria-label="Search by voice" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+  </button>
+</form>
+<label class="select-wrap">
+  <span class="select-label">Category</span>
+  <select id="category" aria-label="Filter by category">
+    <option value="">All Categories</option>
+    {% for value, label in categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+  </select>
+</label>

@@ -1,0 +1,10 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}Browse items | REUSE{% endblock %}
+{% block page %}browse{% endblock %}
+{% block topbar_left %}{% include "partials/search_filter.html" %}{% endblock %}
+{% block content %}
+<h1 class="sr-only">Browse items</h1>
+<div id="items-grid" class="item-grid" aria-live="polite"></div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/browse.js' %}"></script>{% endblock %}

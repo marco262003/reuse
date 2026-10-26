@@ -1,0 +1,15 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}Borrowed items | REUSE{% endblock %}
+{% block page %}borrowed{% endblock %}
+{% block content %}
+<section class="stack" aria-labelledby="h-active">
+  <h1 id="h-active" class="section-tab">Active Borrowed Items</h1>
+  <div id="active-grid" class="card-grid" aria-live="polite"></div>
+</section>
+<section class="stack" aria-labelledby="h-past">
+  <h2 id="h-past" class="section-tab">Past Borrowed Items</h2>
+  <div id="past-grid" class="card-grid" aria-live="polite"></div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/borrowed.js' %}"></script>{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base_auth.html" %}
+{% block title %}Create an account | REUSE{% endblock %}
+{% block page %}create{% endblock %}
+{% block card %}
+<form id="create-form" novalidate>
+  {% include "partials/field.html" with name="full_name" placeholder="Full Name" autocomplete="name" %}
+  {% include "partials/field.html" with name="email" type="email" placeholder="School Email" autocomplete="username" %}
+
+  <div class="field" data-field="mobile">
+    <div class="input-wrap">
+      <span class="phone-prefix" aria-hidden="true">+63</span>
+      <input class="input has-prefix" id="mobile" name="mobile" type="tel" inputmode="numeric" maxlength="13"
+             placeholder="Mobile Number" aria-label="Mobile number, after +63" aria-describedby="mobile-error" autocomplete="tel-national">
+    </div>
+    <p class="field-error" id="mobile-error"></p>
+  </div>
+
+  <div class="field" data-field="user_type">
+    <select class="input" id="user_type" name="user_type" aria-label="User type" aria-describedby="user_type-error">
+      <option value="" selected disabled>User type</option>
+      <option value="student">Student</option>
+      <option value="faculty">Faculty</option>
+      <option value="staff">Staff</option>
+    </select>
+    <p class="field-error" id="user_type-error"></p>
+  </div>
+
+  {% include "partials/password_field.html" with name="password" placeholder="Password" autocomplete="new-password" %}
+  {% include "partials/password_field.html" with name="confirm_password" placeholder="Confirm Password" autocomplete="new-password" %}
+
+  <p class="auth-note">We’ll send a link to your school email. Your account becomes active once you verify it.</p>
+  <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Create Account</button>
+  <p class="auth-foot">Already have an account? <a href="{% url 'login' %}">Log in</a></p>
+</form>
+{% endblock %}
