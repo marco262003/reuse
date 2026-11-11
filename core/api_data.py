@@ -241,6 +241,9 @@ def dashboard(request):
     user = request.user
     active = Borrowing.objects.select_related("item", "request").filter(user=user, status=BorrowingStatus.ACTIVE)
     recent_requests = BorrowRequest.objects.select_related("item", "borrowing").filter(user=user)[:5]
+    ready_for_pickup = BorrowRequest.objects.select_related("item").filter(
+        user=user, status=RequestStatus.APPROVED,
+    ).order_by("borrow_at")[:5]
     recent_items = Item.objects.available().order_by("-date_added")[:5]
     open_requests = BorrowRequest.objects.filter(
         user=user, status__in=[RequestStatus.PENDING, RequestStatus.APPROVED],
@@ -254,6 +257,7 @@ def dashboard(request):
             "alerts": Notification.objects.filter(user=user, is_read=False).count(),
         },
         "recent_requests": [request_dict(r) for r in recent_requests],
+        "ready_for_pickup": [request_dict(r) for r in ready_for_pickup],
         "upcoming_returns": [borrowing_dict(b) for b in active.order_by("due_at")[:5]],
         "recent_items": [item_dict(i) for i in recent_items],
     })

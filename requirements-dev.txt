@@ -1,0 +1,6 @@
+# Only for running REUSE on your own computer: the local stand-in for object storage
+# that runserver starts by itself during development. Not needed on a production server.
+-r requirements.txt
+moto[s3]>=5.2,<6.0
+flask>=3.1
+flask-cors>=6.0

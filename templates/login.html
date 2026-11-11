@@ -1,17 +1,70 @@
 {% extends "base_auth.html" %}
-{% block title %}Log in | REUSE{% endblock %}
+{% load static %}
+{% block title %}Log in{% endblock %}
 {% block page %}login{% endblock %}
 {% block card %}
 <form id="login-form" novalidate>
+  <h2 class="auth-title">Log in</h2>
+  <p class="auth-sub">Use your school email and password to continue.</p>
   {% include "partials/field.html" with name="email" type="email" placeholder="School Email" autocomplete="username" %}
   {% include "partials/password_field.html" with name="password" placeholder="Password" autocomplete="current-password" %}
   <div id="resend-wrap" class="resend" hidden>
     <button type="button" id="resend-link" class="text-link">Resend verification link</button>
   </div>
-  <div class="auth-links">
-    <a href="{% url 'reset_password' %}">Forgot password?</a>
-    <a href="{% url 'create_account' %}">Create an account</a>
-  </div>
+  <p class="auth-forgot"><a href="{% url 'reset_password' %}">Forgot password?</a></p>
   <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Log in</button>
+  <p class="auth-foot">New to REUSE? <a href="{% url 'create_account' %}">Create an account</a></p>
 </form>
+
+<section id="face-step" aria-labelledby="face-title" hidden>
+  <h2 class="auth-title" id="face-title">Confirm it's you</h2>
+  <p class="auth-sub">We compare your face with the photo on your school ID.</p>
+  <div class="scan-stage">
+    <video id="scan-video" autoplay playsinline muted hidden></video>
+    <div class="scan-placeholder" id="scan-placeholder">Your camera preview appears here</div>
+    <p class="scan-prompt" id="scan-prompt" aria-live="assertive" hidden></p>
+  </div>
+  <p class="auth-hint">Use good light, take off hats and sunglasses, and make sure only you are in view. You'll be asked to look straight and turn your head. The pictures are checked and never stored.</p>
+  <button type="button" class="btn btn-primary btn-block" id="scan-start">Start Face Scan</button>
+  <p class="auth-foot" id="use-code-wrap" hidden><button type="button" class="text-link" id="use-code">Camera not working? Get an email code instead</button></p>
+  <p class="auth-foot"><a href="{% url 'login' %}">Back to log in</a></p>
+</section>
+
+<form id="code-step" novalidate hidden>
+  <h2 class="auth-title">Enter your sign-in code</h2>
+  <p class="auth-sub">We sent a 6-digit code to your school email. It works for 10 minutes.</p>
+  {% include "partials/field.html" with name="code" placeholder="Sign-in code" autocomplete="one-time-code" inputmode="numeric" %}
+  <button type="submit" class="btn btn-primary btn-block" id="code-submit">Log in</button>
+  <p class="auth-foot"><button type="button" class="text-link" id="code-resend">Send a new code</button></p>
+  <p class="auth-foot"><a href="{% url 'login' %}">Back to log in</a></p>
+</form>
+
+<form id="enroll-step" novalidate hidden>
+  <h2 class="auth-title">Add your school ID</h2>
+  <p class="auth-sub">Your account has no face on file yet. We use the photo on your school ID to recognise you when you log in.</p>
+  <div class="field" data-field="file">
+    <label class="input-label" for="enroll-front">Front of your school ID</label>
+    <input class="file-input" id="enroll-front" name="file" type="file" accept="image/jpeg,image/png,application/pdf"
+           aria-describedby="enroll-file-error enroll-help">
+    <p class="field-error" id="enroll-file-error"></p>
+  </div>
+  <p class="auth-hint" id="enroll-help">JPG, PNG or PDF, up to {{ upload_limits.megabytes }} MB. Lay the card flat in good light, with no glare on the photo.</p>
+  <div class="field consent" data-field="consent">
+    <label for="enroll-consent">
+      <input type="checkbox" id="enroll-consent" name="consent" aria-describedby="enroll-consent-error">
+      <span>{% include "partials/consent_text.html" %}</span>
+    </label>
+    <p class="field-error" id="enroll-consent-error"></p>
+  </div>
+  <button type="submit" class="btn btn-primary btn-block" id="enroll-submit">Add My ID</button>
+  <p class="auth-foot"><a href="{% url 'login' %}">Back to log in</a></p>
+</form>
+
+<canvas id="scan-canvas" hidden></canvas>
+{{ upload_limits|json_script:"upload-limits" }}
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/id_upload.js' %}"></script>
+<script src="{% static 'js/face_scan.js' %}"></script>
+<script src="{% static 'js/login.js' %}"></script>
 {% endblock %}

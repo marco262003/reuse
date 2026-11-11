@@ -12,12 +12,15 @@
       return;
     }
     list.innerHTML = notes.map((n) => `
-      <li class="note ${n.is_read ? "is-read" : ""}" data-id="${n.id}">
-        ${n.link
-          ? `<button type="button" class="note-text" data-open="${n.id}">${esc(n.message)}</button>`
-          : `<p class="note-text">${esc(n.message)}</p>`}
-        <time datetime="${esc(n.created_at)}">${esc(fmt.ago(n.created_at))}</time>
-        ${n.is_read ? "" : `<button type="button" class="btn btn-primary btn-sm" data-read="${n.id}">Mark as read</button>`}
+      <li class="suggestion note ${n.is_read ? "is-read" : ""}" data-id="${n.id}">
+        <span class="suggestionmark" aria-hidden="true">i</span>
+        <div class="grow">
+          ${n.link
+            ? `<button type="button" class="note-text" data-open="${n.id}">${esc(n.message)}</button>`
+            : `<p class="note-text">${esc(n.message)}</p>`}
+          <time datetime="${esc(n.created_at)}">${esc(fmt.ago(n.created_at))}</time>
+        </div>
+        ${n.is_read ? '<span class="status neutral">Read</span>' : `<button type="button" class="link-btn" data-read="${n.id}">Mark as read</button>`}
       </li>`).join("");
   }
 

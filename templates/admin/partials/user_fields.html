@@ -1,0 +1,9 @@
+<div class="fields">
+  <label class="field">First name<input name="first_name" required maxlength="60" value="{{ first_name|default:'' }}" placeholder="First name"></label>
+  <label class="field">Middle name (optional)<input name="middle_name" maxlength="60" value="{{ middle_name|default:'' }}" placeholder="Middle name"></label>
+  <label class="field">Last name<input name="last_name" required maxlength="60" value="{{ last_name|default:'' }}" placeholder="Last name"></label>
+  <label class="field">Suffix (optional)<input name="suffix" maxlength="10" placeholder="Jr, Sr, III" value="{{ suffix|default:'' }}"></label>
+  <label class="field">School email<input name="email" type="email" required value="{{ email|default:'' }}" placeholder="name@g.batstate-u.edu.ph"></label>
+  <label class="field">Mobile number<input name="mobile" type="tel" required placeholder="+63 9XX XXX XXXX" value="{{ mobile|default:'' }}"></label>
+  <label class="field">User type<select name="user_type" required>{% for val,label in user_types %}<option value="{{ val }}" {% if user_type == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+</div>

@@ -10,6 +10,7 @@
     document.getElementById("p-type").textContent = user.user_type_label;
     document.getElementById("p-email").textContent = user.email;
     document.getElementById("p-mobile").textContent = user.mobile || "Not set";
+    document.getElementById("p-face").textContent = user.face_login ? "Set up" : "Not set up";
     if (user.profile_image_url) document.getElementById("profile-photo-preview").src = user.profile_image_url;
   });
 
@@ -19,20 +20,21 @@
   const photoSave = document.getElementById("profile-photo-save");
   const photoError = document.getElementById("profile-photo-error");
   let selectedPhoto = null;
+  const showSave = (on) => { photoSave.hidden = !on; photoSave.disabled = !on; };
   photoInput.addEventListener("change", () => {
     selectedPhoto = photoInput.files && photoInput.files[0];
     photoError.textContent = "";
-    if (!selectedPhoto) { photoSave.disabled = true; return; }
+    if (!selectedPhoto) { showSave(false); return; }
     if (selectedPhoto.size > 5 * 1024 * 1024) {
       photoError.textContent = "Photo must be 5 MB or smaller.";
-      photoInput.value = ""; selectedPhoto = null; photoSave.disabled = true; return;
+      photoInput.value = ""; selectedPhoto = null; showSave(false); return;
     }
     if (! ["image/jpeg", "image/png", "image/webp"].includes(selectedPhoto.type)) {
       photoError.textContent = "Upload a JPG, PNG, or WEBP image.";
-      photoInput.value = ""; selectedPhoto = null; photoSave.disabled = true; return;
+      photoInput.value = ""; selectedPhoto = null; showSave(false); return;
     }
     photoPreview.src = URL.createObjectURL(selectedPhoto);
-    photoSave.disabled = false;
+    showSave(true);
   });
   photoForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -47,7 +49,7 @@
       if (result.user.profile_image_url) photoPreview.src = result.user.profile_image_url;
       selectedPhoto = null; photoInput.value = ""; R.toast("Profile photo updated.", "success");
     } catch (err) { photoError.textContent = err.message || "Could not upload photo. Please try again."; }
-    finally { photoSave.disabled = !selectedPhoto; photoSave.textContent = "Save photo"; }
+    finally { showSave(Boolean(selectedPhoto)); photoSave.textContent = "Save photo"; }
   });
 
   const passwordField = (name, label, auto) => `
@@ -102,18 +104,5 @@
       R.showErrors(form, res.errors);
       if (!Object.keys(res.errors || {}).length) R.alert(alertBox, res.message || "We couldn't change your password.");
     });
-  });
-
-  document.getElementById("logout-btn").addEventListener("click", async () => {
-    const yes = await R.confirm({
-      title: "Log out of REUSE?",
-      message: "You’ll need to log in again to request or return items.",
-      confirmText: "Log out",
-      cancelText: "Stay logged in",
-    });
-    if (!yes) return;
-    const res = await R.api.post("/api/auth/logout/");
-    if (res.ok) window.location.href = res.redirect || "/login/";
-    else R.toast(res.message || "We couldn't log you out. Please try again.", "error");
   });
 })();

@@ -1,11 +1,70 @@
-{% load static %}<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ admin_title }} | REUSE Admin</title><link rel="stylesheet" href="{% static 'css/style.css' %}"><style>
-.admin-layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.admin-side{position:sticky;top:0;height:100vh;background:linear-gradient(140deg,#ee0836,#b91c32);color:white;padding:28px 18px;display:flex;flex-direction:column}.admin-logo{font:44px Georgia,serif;text-align:center;line-height:1}.admin-sub{font-size:11px;letter-spacing:.2em;text-align:center;margin:7px 0 30px}.admin-nav{display:grid;gap:7px}.admin-nav a{padding:12px 15px;border-radius:24px;text-decoration:none;color:white;font-weight:650}.admin-nav a:hover,.admin-nav a.active{background:#ffffff55}.admin-side-foot{margin-top:auto;border-top:1px solid #ffffff55;padding-top:18px;font-size:13px}.admin-main{min-width:0;padding:28px 34px 50px;background:#f1eeea}.admin-top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:25px}.admin-top h1{font-size:28px}.admin-top a{color:#c8102e;font-weight:700}.admin-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.admin-card,.admin-panel{background:white;border:1px solid #e2ded9;border-radius:18px;padding:20px;min-width:0}.admin-card small{display:block;color:#626773;font-weight:650}.admin-card strong{display:block;font-size:32px;margin-top:5px}.admin-panel{margin-top:20px}.admin-panel h2{font-size:18px;margin-bottom:15px}.admin-table-wrap{overflow:auto}.admin-table{width:100%;border-collapse:collapse;font-size:14px}.admin-table th,.admin-table td{text-align:left;padding:12px 10px;border-bottom:1px solid #ece8e4;vertical-align:top}.admin-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#555b65;white-space:nowrap}.admin-actions{display:flex;gap:6px;flex-wrap:wrap}.admin-actions .btn{min-height:34px;padding:0 12px;font-size:12px}.admin-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.admin-form input,.admin-form select,.admin-field input,.admin-field select,.admin-field textarea{border:1px solid #c9c4bd;background:#fff;border-radius:10px;padding:10px 12px;min-height:42px;max-width:100%}.admin-form input[type=search]{min-width:220px}.admin-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.admin-field{display:grid;gap:5px;font-size:13px;font-weight:700}.admin-field textarea{min-height:80px}.admin-field.full{grid-column:1/-1}.admin-badge{display:inline-block;border-radius:20px;padding:4px 9px;background:#f3eee8;font-size:12px;font-weight:700}.admin-badge.pending,.admin-badge.overdue{background:#fde8ea;color:#991b1b}.admin-badge.approved,.admin-badge.active{background:#e4f5ec;color:#095c37}.admin-messages{display:grid;gap:8px;margin-bottom:16px}.admin-message{background:#fff;border:1px solid #ddd;padding:12px 15px;border-radius:10px}.admin-message.success{border-color:#88c8a5}.admin-message.error{border-color:#e5a3a8}.admin-muted{color:#6b7280}.admin-inline{display:inline}.admin-inline input[type=text]{width:150px;border:1px solid #c9c4bd;border-radius:8px;padding:7px}.admin-bar-row{display:grid;grid-template-columns:90px 1fr 30px;gap:10px;align-items:center;margin:10px 0;font-size:13px}.admin-bar{height:10px;border-radius:20px;background:#f4d6dc;overflow:hidden}.admin-bar span{display:block;height:100%;background:#dd1f2a}.admin-quick{display:flex;gap:10px;flex-wrap:wrap}.admin-quick a{color:#c8102e;font-weight:700}.admin-empty{padding:22px;text-align:center;color:#68707c}.admin-danger{color:#a3121e}.admin-warning{color:#8a5a00}@media(max-width:900px){.admin-layout{grid-template-columns:1fr}.admin-side{position:static;height:auto}.admin-nav{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-side-foot{margin-top:18px}.admin-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-main{padding:20px 14px}}@media(max-width:560px){.admin-grid,.admin-fields{grid-template-columns:1fr}.admin-top{align-items:flex-start;flex-direction:column}.admin-form input[type=search]{min-width:0;width:100%}}
-</style></head><body><div class="admin-layout"><aside class="admin-side"><a href="{% url 'staff_dashboard' %}" class="admin-logo" style="color:white;text-decoration:none">REUSE</a><div class="admin-sub">COMMUNITY · ADMIN</div><nav class="admin-nav">
-<a href="{% url 'staff_dashboard' %}" class="{% if request.resolver_match.url_name == 'staff_dashboard' %}active{% endif %}">Dashboard</a>
-<a href="{% url 'staff_items' %}" class="{% if request.resolver_match.url_name == 'staff_items' %}active{% endif %}">Manage Items</a>
-<a href="{% url 'staff_requests' %}" class="{% if request.resolver_match.url_name == 'staff_requests' or request.resolver_match.url_name == 'staff_request_action' %}active{% endif %}">Borrowing Requests</a>
-<a href="{% url 'staff_borrowings' %}" class="{% if request.resolver_match.url_name == 'staff_borrowings' %}active{% endif %}">Active Borrowings</a>
-<a href="{% url 'staff_returns' %}" class="{% if request.resolver_match.url_name == 'staff_returns' or request.resolver_match.url_name == 'staff_return_action' %}active{% endif %}">Return Management</a>
-<a href="{% url 'staff_users' %}" class="{% if request.resolver_match.url_name == 'staff_users' or request.resolver_match.url_name == 'staff_user_toggle' %}active{% endif %}">User Management</a></nav><div class="admin-side-foot"><strong>{{ admin_user.full_name|default:admin_user.email }}</strong><br><span class="admin-muted" style="color:#ffe0e5">Administrator</span><p style="margin-top:12px"><form method="post" action="{% url 'staff_logout' %}" style="display:inline">{% csrf_token %}<button type="submit" style="border:0;background:transparent;color:white;text-decoration:underline;cursor:pointer;padding:0">Log out</button></form> · <a href="/admin/" style="color:white">Django Admin</a></p></div></aside><main class="admin-main"><header class="admin-top"><h1>{{ admin_title }}</h1><div><a href="{% url 'staff_notifications' %}">Notifications{% if unread_notifications %} ({{ unread_notifications }}){% endif %}</a> &nbsp;·&nbsp; <a href="/admin/password_change/">Profile / Password</a> &nbsp;·&nbsp; {{ admin_user.email }}</div></header>
-{% if messages %}<div class="admin-messages">{% for message in messages %}<div class="admin-message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% block content %}{% endblock %}</main></div></body></html>
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ admin_title }}{% endblock %} | REUSE Admin</title>
+  <link rel="icon" type="image/png" href="{% static 'img/reuse-logo-maroon.png' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+{% with url_name=request.resolver_match.url_name %}
+<body class="admin">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <a class="brandlink" href="{% url 'staff_dashboard' %}"><img src="{% static 'img/reuse-logo-maroon.png' %}" alt="REUSE logo"><span class="brandtext">REUSE<small>COMMUNITY RESOURCE SYSTEM</small></span></a>
+        <button type="button" class="collapse" id="collapse" title="Collapse sidebar" aria-label="Collapse sidebar" aria-controls="sidebar" aria-expanded="true">«</button>
+      </div>
+      <nav aria-label="Admin">
+        <div class="navgroup">
+          <div class="navlabel">OVERVIEW</div>
+          <a class="navitem {% if url_name == 'staff_dashboard' %}active{% endif %}" href="{% url 'staff_dashboard' %}" title="Dashboard"><span class="navicon">{% include "partials/icon.html" with name="dashboard" %}</span><span class="txt">Dashboard</span></a>
+          <a class="navitem {% if url_name == 'staff_notifications' %}active{% endif %}" href="{% url 'staff_notifications' %}" title="Notifications"><span class="navicon">{% include "partials/icon.html" with name="bell" %}</span><span class="txt">Notifications</span>{% if unread_notifications %}<span class="navbadge">{{ unread_notifications }}</span>{% endif %}</a>
+        </div>
+        <div class="navgroup">
+          <div class="navlabel">MANAGEMENT</div>
+          <a class="navitem {% if url_name == 'staff_items' %}active{% endif %}" href="{% url 'staff_items' %}" title="Manage Resources"><span class="navicon">{% include "partials/icon.html" with name="items" %}</span><span class="txt">Manage Resources</span></a>
+          <a class="navitem {% if url_name == 'staff_users' or url_name == 'staff_user_toggle' or url_name == 'staff_user_new' or url_name == 'staff_user_detail' %}active{% endif %}" href="{% url 'staff_users' %}" title="Manage Users"><span class="navicon">{% include "partials/icon.html" with name="users" %}</span><span class="txt">Manage Users</span></a>
+          <a class="navitem {% if url_name == 'staff_requests' or url_name == 'staff_request_action' %}active{% endif %}" href="{% url 'staff_requests' %}" title="Borrow Requests"><span class="navicon">{% include "partials/icon.html" with name="requests" %}</span><span class="txt">Borrow Requests</span>{% if pending_requests %}<span class="navbadge">{{ pending_requests }}</span>{% endif %}</a>
+          <a class="navitem {% if url_name == 'staff_borrowings' %}active{% endif %}" href="{% url 'staff_borrowings' %}" title="Active Borrowings"><span class="navicon">{% include "partials/icon.html" with name="borrow" %}</span><span class="txt">Active Borrowings</span></a>
+          <a class="navitem {% if url_name == 'staff_returns' or url_name == 'staff_return_action' %}active{% endif %}" href="{% url 'staff_returns' %}" title="Returns &amp; Records"><span class="navicon">{% include "partials/icon.html" with name="returns" %}</span><span class="txt">Returns &amp; Records</span></a>
+        </div>
+        <div class="navgroup">
+          <div class="navlabel">ACCOUNT</div>
+          <a class="navitem" href="/admin/password_change/" title="Profile / Password"><span class="navicon">{% include "partials/icon.html" with name="profile" %}</span><span class="txt">Profile / Password</span></a>
+          <a class="navitem" href="/admin/" title="Django Admin"><span class="navicon">{% include "partials/icon.html" with name="settings" %}</span><span class="txt">Django Admin</span></a>
+        </div>
+      </nav>
+      <div class="sidebarbottom">
+        <form method="post" action="{% url 'staff_logout' %}">{% csrf_token %}<button type="submit" class="navitem" title="Sign Out"><span class="navicon">{% include "partials/icon.html" with name="logout" %}</span><span class="txt">Sign Out</span></button></form>
+        <div class="account">{% include "partials/avatar.html" with u=admin_user %}<div class="accounttext"><b>{{ admin_user.full_name|default:admin_user.email }}</b><small>System Administrator</small></div></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="crumb">REUSE / <strong>{% block crumb %}{{ admin_title }}{% endblock %}</strong></div>
+        <div class="topright">
+          <a class="iconbutton {% if url_name == 'staff_notifications' %}is-active{% endif %}" href="{% url 'staff_notifications' %}" title="Notifications" aria-label="Notifications{% if unread_notifications %}, {{ unread_notifications }} unread{% endif %}">{% include "partials/icon.html" with name="bell" %}{% if unread_notifications %}<span class="ping"></span>{% endif %}</a>
+          <span class="rolepill">ADMIN</span>
+          <a class="switchrole" href="/admin/">Django Admin</a>
+          <span title="{{ admin_user.email }}">{% include "partials/avatar.html" with u=admin_user %}</span>
+        </div>
+      </header>
+
+      <main id="main" class="workspace">
+        <div class="pagehead">
+          <div><h1>{% block page_title %}{{ admin_title }}{% endblock %}</h1><p>{% block page_sub %}{% endblock %}</p></div>
+          <div class="pageactions">{% block page_actions %}{% endblock %}</div>
+        </div>
+        {% if messages %}<div class="messages">{% for message in messages %}<div class="message {{ message.tags }}" role="status">{{ message }}</div>{% endfor %}</div>{% endif %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+  <script src="{% static 'js/shell.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+{% endwith %}
+</html>

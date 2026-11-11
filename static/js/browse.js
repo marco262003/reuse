@@ -7,16 +7,16 @@
   let seq = 0;
 
   const card = (i) => `
-    <article class="item-card ${i.is_available ? "" : "is-unavailable"}" data-item="${i.id}">
-      <img src="${esc(i.image_url || R.placeholder)}" alt="" loading="lazy">
-      <dl class="item-meta">
-        <div><dt>Item:</dt><dd>${esc(i.name)}</dd></div>
-        <div><dt>Qty Available:</dt><dd>${i.available_qty}</dd></div>
-        <div><dt>Times Borrowed:</dt><dd>${i.times_borrowed}</dd></div>
-        <div><dt>Condition:</dt><dd>${esc(i.condition_label)}</dd></div>
-      </dl>
-      <p class="avail ${i.is_available ? "avail-yes" : "avail-no"}">${i.is_available ? "AVAILABLE" : "UNAVAILABLE"}${i.is_available ? "" : `<span class="avail-reason">${esc(i.unavailable_reason)}</span>`}</p>
-      <button type="button" class="btn btn-primary" data-item="${i.id}">View</button>
+    <article class="resourcecard ${i.is_available ? "" : "is-unavailable"}" data-item="${i.id}">
+      <div class="resourcevisual"><img src="${esc(i.image_url || R.placeholder)}" alt="" loading="lazy"></div>
+      <h3>${esc(i.name)}</h3>
+      <p>${esc(i.category_label)} · ${esc(i.condition_label)}${i.is_available ? "" : ` · ${esc(i.unavailable_reason)}`}</p>
+      <div class="resourcefoot">
+        ${i.is_available
+          ? `<span class="status">${i.available_qty} Available</span>`
+          : '<span class="status declined">Unavailable</span>'}
+        <button type="button" class="btn secondary" data-item="${i.id}">View details</button>
+      </div>
     </article>`;
 
   async function load(silent) {

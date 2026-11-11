@@ -1,26 +1,35 @@
 {% extends "base_app.html" %}
 {% load static %}
-{% block title %}My profile | REUSE{% endblock %}
+{% block title %}My Profile{% endblock %}
 {% block page %}profile{% endblock %}
+{% block crumb %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_sub %}Manage your account information.{% endblock %}
 {% block content %}
-<h1 class="page-title">MY PROFILE</h1>
-<section class="card profile-card" aria-label="Profile details">
-  <img class="avatar-lg" id="profile-photo-preview" src="{% static 'img/avatar.svg' %}" alt="Profile picture">
-  <form id="profile-photo-form" class="profile-photo-form" enctype="multipart/form-data">
-    <label for="profile-photo-input" class="btn btn-outline">Choose profile photo</label>
-    <input id="profile-photo-input" name="image" type="file" accept="image/jpeg,image/png,image/webp" hidden>
-    <p class="muted">JPG, PNG, or WEBP · maximum 5 MB</p>
-    <p class="field-error" id="profile-photo-error" role="alert"></p>
-    <button class="btn btn-primary" type="submit" id="profile-photo-save" disabled>Save photo</button>
-  </form>
-  <h2 class="profile-fullname" id="p-name"></h2>
-  <p class="profile-type" id="p-type"></p>
+<section class="formcard" aria-label="Profile details">
+  <div class="profiletop">
+    <span class="avatar"><img id="profile-photo-preview" src="{% if request.user.profile_image %}{{ request.user.profile_image.url }}{% else %}{% static 'img/avatar.svg' %}{% endif %}" alt="Profile picture"></span>
+    <div>
+      <b id="p-name">{{ request.user.full_name }}</b>
+      <p id="p-type">{{ request.user.get_user_type_display }}</p>
+    </div>
+    <form id="profile-photo-form" class="profile-photo-form" enctype="multipart/form-data">
+      <label for="profile-photo-input" class="btn secondary">Choose profile photo</label>
+      <input id="profile-photo-input" name="image" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+      <button class="btn" type="submit" id="profile-photo-save" hidden disabled>Save photo</button>
+      <p class="field-hint">JPG, PNG, or WEBP · maximum 5 MB</p>
+      <p class="field-error" id="profile-photo-error" role="alert"></p>
+    </form>
+  </div>
   <dl class="profile-fields">
-    <div><dt>School Email</dt><dd id="p-email"></dd></div>
-    <div><dt>Mobile Number</dt><dd id="p-mobile"></dd></div>
+    <div><dt>Full Name</dt><dd>{{ request.user.full_name }}</dd></div>
+    <div><dt>School Email</dt><dd id="p-email">{{ request.user.email }}</dd></div>
+    <div><dt>Mobile Number</dt><dd id="p-mobile">{{ request.user.mobile|default:"Not set" }}</dd></div>
+    <div><dt>Face Login</dt><dd id="p-face">{% if request.user.face_template %}Set up{% else %}Not set up{% endif %}</dd></div>
   </dl>
-  <button type="button" class="row-btn" id="change-password-btn">Change Password <span aria-hidden="true">&gt;</span></button>
-  <button type="button" class="btn btn-primary" id="logout-btn">Log out</button>
+  <div class="formactions">
+    <button type="button" class="btn" id="change-password-btn">Change Password</button>
+  </div>
 </section>
 {% endblock %}
 {% block scripts %}<script src="{% static 'js/profile.js' %}"></script>{% endblock %}

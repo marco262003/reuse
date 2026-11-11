@@ -1,35 +1,65 @@
 {% extends "base_auth.html" %}
-{% block title %}Create an account | REUSE{% endblock %}
+{% load static %}
+{% block title %}Create an account{% endblock %}
 {% block page %}create{% endblock %}
+{% block card_class %}wide{% endblock %}
 {% block card %}
-<form id="create-form" novalidate>
-  {% include "partials/field.html" with name="full_name" placeholder="Full Name" autocomplete="name" %}
-  {% include "partials/field.html" with name="email" type="email" placeholder="School Email" autocomplete="username" %}
+<ol class="steps" id="reg-steps" aria-label="Sign-up steps">
+  <li data-step="id" class="is-current">1. School ID</li>
+  <li data-step="details">2. Your details</li>
+  <li data-step="review">3. Review</li>
+</ol>
 
-  <div class="field" data-field="mobile">
-    <div class="input-wrap">
-      <span class="phone-prefix" aria-hidden="true">+63</span>
-      <input class="input has-prefix" id="mobile" name="mobile" type="tel" inputmode="numeric" maxlength="13"
-             placeholder="Mobile Number" aria-label="Mobile number, after +63" aria-describedby="mobile-error" autocomplete="tel-national">
-    </div>
-    <p class="field-error" id="mobile-error"></p>
+<section id="step-id" aria-labelledby="step-id-title">
+  <h2 class="auth-title" id="step-id-title">Start with your school ID</h2>
+  <p class="auth-sub">We read your details from it, and use its photo to recognise you when you log in.</p>
+  <div class="field" data-field="file">
+    <label class="input-label" for="id-front">Front of your school ID</label>
+    <input class="file-input" id="id-front" name="file" type="file" accept="image/jpeg,image/png,application/pdf"
+           aria-describedby="file-error id-help">
+    <p class="field-error" id="file-error"></p>
   </div>
-
-  <div class="field" data-field="user_type">
-    <select class="input" id="user_type" name="user_type" aria-label="User type" aria-describedby="user_type-error">
-      <option value="" selected disabled>User type</option>
-      <option value="student">Student</option>
-      <option value="faculty">Faculty</option>
-      <option value="staff">Staff</option>
-    </select>
-    <p class="field-error" id="user_type-error"></p>
+  <div class="field" data-field="back">
+    <label class="input-label" for="id-back">Back of your school ID (optional)</label>
+    <input class="file-input" id="id-back" name="back" type="file" accept="image/jpeg,image/png,application/pdf"
+           aria-describedby="back-error">
+    <p class="field-error" id="back-error"></p>
   </div>
-
-  {% include "partials/password_field.html" with name="password" placeholder="Password" autocomplete="new-password" %}
-  {% include "partials/password_field.html" with name="confirm_password" placeholder="Confirm Password" autocomplete="new-password" %}
-
-  <p class="auth-note">We’ll send a link to your school email. Your account becomes active once you verify it.</p>
-  <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Create Account</button>
+  <p class="auth-hint" id="id-help">JPG, PNG or PDF, up to {{ upload_limits.megabytes }} MB. Lay the card flat in good light, with no glare on the photo.</p>
+  <button type="button" class="btn btn-primary btn-block" id="id-continue">Read My ID</button>
+  <p class="auth-foot" id="id-back-to-form" hidden><button type="button" class="text-link" id="keep-id">Keep the ID I already added</button></p>
   <p class="auth-foot">Already have an account? <a href="{% url 'login' %}">Log in</a></p>
+</section>
+
+<form id="create-form" novalidate hidden>
+  <h2 class="auth-title">Your details</h2>
+  <p class="auth-sub">Check what we read from your ID, then fill in the rest.</p>
+  <p class="form-alert is-info" id="extract-note" hidden></p>
+  <fieldset class="field-group">
+    <legend>From your school ID</legend>
+    {% for f in id_fields %}{% include "partials/registration_field.html" %}{% endfor %}
+  </fieldset>
+  <fieldset class="field-group">
+    <legend>About your account</legend>
+    {% for f in manual_fields %}{% include "partials/registration_field.html" %}{% endfor %}
+  </fieldset>
+  <button type="submit" class="btn btn-primary btn-block" id="review-btn">Review</button>
+  <p class="auth-foot"><button type="button" class="text-link" id="change-id">Use a different ID photo</button></p>
 </form>
+
+<section id="step-review" aria-labelledby="review-title" hidden>
+  <h2 class="auth-title" id="review-title">Review your details</h2>
+  <p class="auth-sub">Nothing is saved until you create the account. We'll then send a link to your school email.</p>
+  <div id="review-list"></div>
+  <button type="button" class="btn btn-primary btn-block" id="submit-btn">Create Account</button>
+  <button type="button" class="btn btn-outline btn-block" id="edit-btn">Edit Details</button>
+</section>
+
+{{ registration_schema|json_script:"registration-schema" }}
+{{ upload_limits|json_script:"upload-limits" }}
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/autofill.js' %}"></script>
+<script src="{% static 'js/id_upload.js' %}"></script>
+<script src="{% static 'js/register.js' %}"></script>
 {% endblock %}

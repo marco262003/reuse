@@ -1,15 +1,20 @@
 {% extends "base_app.html" %}
 {% load static %}
-{% block title %}Borrowed items | REUSE{% endblock %}
+{% block title %}{% if request.GET.tab == 'history' %}Borrowing History{% else %}My Borrowings{% endif %}{% endblock %}
 {% block page %}borrowed{% endblock %}
+{% block crumb %}{% if request.GET.tab == 'history' %}Borrowing History{% else %}My Borrowings{% endif %}{% endblock %}
+{% block page_title %}<span id="borrowed-title">{% if request.GET.tab == 'history' %}Borrowing History{% else %}My Borrowings{% endif %}</span>{% endblock %}
+{% block page_sub %}<span id="borrowed-sub">{% if request.GET.tab == 'history' %}View your previous borrowing transactions.{% else %}Monitor your active borrowing transactions.{% endif %}</span>{% endblock %}
 {% block content %}
-<section class="stack" aria-labelledby="h-active">
-  <h1 id="h-active" class="section-tab">Active Borrowed Items</h1>
-  <div id="active-grid" class="card-grid" aria-live="polite"></div>
+<div class="tabs" role="tablist" aria-label="Borrowed items">
+  <button type="button" class="tab" role="tab" id="tab-active" aria-controls="panel-active" aria-selected="true">Active <span class="tab-count" id="count-active"></span></button>
+  <button type="button" class="tab" role="tab" id="tab-history" aria-controls="panel-history" aria-selected="false" tabindex="-1">History <span class="tab-count" id="count-history"></span></button>
+</div>
+<section id="panel-active" role="tabpanel" aria-labelledby="tab-active">
+  <div id="active-grid" class="tablewrap" aria-live="polite"></div>
 </section>
-<section class="stack" aria-labelledby="h-past">
-  <h2 id="h-past" class="section-tab">Past Borrowed Items</h2>
-  <div id="past-grid" class="card-grid" aria-live="polite"></div>
+<section id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+  <div id="past-grid" class="tablewrap" aria-live="polite"></div>
 </section>
 {% endblock %}
 {% block scripts %}<script src="{% static 'js/borrowed.js' %}"></script>{% endblock %}

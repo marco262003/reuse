@@ -1,11 +1,14 @@
 {% extends "base_app.html" %}
 {% load static %}
-{% block title %}Notifications | REUSE{% endblock %}
+{% block title %}Notifications{% endblock %}
 {% block page %}notifications{% endblock %}
+{% block crumb %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+{% block page_sub %}Updates on approvals, borrowing schedules, and returns.{% endblock %}
+{% block page_actions %}<button type="button" class="btn secondary" id="mark-all" disabled>Mark all as read</button>{% endblock %}
 {% block content %}
-<h1 class="page-title">Notifications</h1>
-<section class="card notes-card">
-  <div class="notes-head"><button type="button" class="btn btn-primary btn-sm" id="mark-all" disabled>Mark all as read</button></div>
+<section class="panel" aria-labelledby="h-notes">
+  <div class="panelhead"><h2 id="h-notes">Recent Notifications</h2><small>Latest updates</small></div>
   <ul class="notes" id="notes" aria-live="polite"></ul>
 </section>
 {% endblock %}

@@ -1,0 +1,14 @@
+{% extends "admin/base_admin.html" %}
+{% block crumb %}Manage Users / Add User{% endblock %}
+{% block page_title %}Add New User{% endblock %}
+{% block page_sub %}Create a community member account.{% endblock %}
+{% block content %}
+<a class="backlink" href="{% url 'staff_users' %}">&larr; All users</a>
+<section class="formcard">
+  <form method="post">{% csrf_token %}
+    {% include "admin/partials/user_fields.html" with first_name=form.first_name middle_name=form.middle_name last_name=form.last_name suffix=form.suffix email=form.email mobile=form.mobile user_type=form.user_type %}
+    <div class="insight">The person gets an email explaining how to set their password. They add their school ID the first time they log in, which sets up their face login.</div>
+    <div class="formactions"><button class="btn" type="submit">Create User</button><a class="btn secondary" href="{% url 'staff_users' %}">Cancel</a></div>
+  </form>
+</section>
+{% endblock %}

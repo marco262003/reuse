@@ -3,45 +3,68 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}REUSE{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>{% block title %}REUSE{% endblock %} | REUSE</title>
+  <link rel="icon" type="image/png" href="{% static 'img/reuse-logo-maroon.png' %}">
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
+{% with url_name=request.resolver_match.url_name %}
 <body class="app" data-page="{% block page %}{% endblock %}">
   <a class="skip-link" href="#main">Skip to content</a>
-
-  <aside class="sidebar">
-    <a class="brand" href="{% url 'dashboard' %}">REUSE</a>
-    {% block clock %}{% endblock %}
-    <nav class="nav" aria-label="Main">
-      <a href="{% url 'dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active" aria-current="page"{% endif %}>Dashboard</a>
-      <a href="{% url 'browse' %}" {% if request.resolver_match.url_name == 'browse' %}class="active" aria-current="page"{% endif %}>Browse Items</a>
-      <a href="{% url 'requests' %}" {% if request.resolver_match.url_name == 'requests' %}class="active" aria-current="page"{% endif %}>My Requests</a>
-      <a href="{% url 'borrowed' %}" {% if request.resolver_match.url_name == 'borrowed' %}class="active" aria-current="page"{% endif %}>Borrowed Items</a>
-      <a href="{% url 'returns' %}" {% if request.resolver_match.url_name == 'returns' %}class="active" aria-current="page"{% endif %}>Items to Return</a>
-    </nav>
-  </aside>
-
-  <div class="content">
-    <header class="topbar">
-      <div class="topbar-left">{% block topbar_left %}{% endblock %}</div>
-      <div class="topbar-right">
-        <a class="bell {% if request.resolver_match.url_name == 'notifications' %}is-active{% endif %}" href="{% url 'notifications' %}" aria-label="Notifications">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7.5 2 7.5H4S6 15 6 9Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
-          <span class="bell-badge" id="bell-badge" hidden></span>
-        </a>
-        <a class="profile-link {% if request.resolver_match.url_name == 'profile' %}is-active{% endif %}" href="{% url 'profile' %}" aria-label="My profile">
-          <span class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7Z"/></svg></span>
-          <span class="profile-name" id="user-name"></span>
-        </a>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <a class="brandlink" href="{% url 'dashboard' %}"><img src="{% static 'img/reuse-logo-maroon.png' %}" alt="REUSE logo"><span class="brandtext">REUSE<small>COMMUNITY RESOURCE SYSTEM</small></span></a>
+        <button type="button" class="collapse" id="collapse" title="Collapse sidebar" aria-label="Collapse sidebar" aria-controls="sidebar" aria-expanded="true">«</button>
       </div>
-    </header>
+      <nav aria-label="Main">
+        <div class="navgroup">
+          <div class="navlabel">OVERVIEW</div>
+          <a class="navitem {% if url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}" title="Dashboard" {% if url_name == 'dashboard' %}aria-current="page"{% endif %}><span class="navicon">{% include "partials/icon.html" with name="dashboard" %}</span><span class="txt">Dashboard</span></a>
+        </div>
+        <div class="navgroup">
+          <div class="navlabel">MY REUSE</div>
+          <a class="navitem {% if url_name == 'browse' %}active{% endif %}" href="{% url 'browse' %}" title="Browse Resources" {% if url_name == 'browse' %}aria-current="page"{% endif %}><span class="navicon">{% include "partials/icon.html" with name="browse" %}</span><span class="txt">Browse Resources</span></a>
+          <a class="navitem {% if url_name == 'requests' %}active{% endif %}" href="{% url 'requests' %}" title="My Requests" {% if url_name == 'requests' %}aria-current="page"{% endif %}><span class="navicon">{% include "partials/icon.html" with name="requests" %}</span><span class="txt">My Requests</span></a>
+          <a class="navitem {% if url_name == 'borrowed' and request.GET.tab != 'history' %}active{% endif %}" href="{% url 'borrowed' %}" title="My Borrowings" data-nav-tab="active"><span class="navicon">{% include "partials/icon.html" with name="borrow" %}</span><span class="txt">My Borrowings</span></a>
+          <a class="navitem {% if url_name == 'borrowed' and request.GET.tab == 'history' %}active{% endif %}" href="{% url 'borrowed' %}?tab=history" title="Borrowing History" data-nav-tab="history"><span class="navicon">{% include "partials/icon.html" with name="history" %}</span><span class="txt">Borrowing History</span></a>
+          <a class="navitem {% if url_name == 'notifications' %}active{% endif %}" href="{% url 'notifications' %}" title="Notifications" {% if url_name == 'notifications' %}aria-current="page"{% endif %}><span class="navicon">{% include "partials/icon.html" with name="bell" %}</span><span class="txt">Notifications</span><span class="navbadge" id="nav-notes-badge" hidden></span></a>
+        </div>
+        <div class="navgroup">
+          <div class="navlabel">ACCOUNT</div>
+          <a class="navitem {% if url_name == 'profile' %}active{% endif %}" href="{% url 'profile' %}" title="My Profile" {% if url_name == 'profile' %}aria-current="page"{% endif %}><span class="navicon">{% include "partials/icon.html" with name="profile" %}</span><span class="txt">My Profile</span></a>
+        </div>
+      </nav>
+      <div class="sidebarbottom">
+        <button type="button" class="navitem" data-logout title="Sign Out"><span class="navicon">{% include "partials/icon.html" with name="logout" %}</span><span class="txt">Sign Out</span></button>
+        <div class="account">{% include "partials/avatar.html" with u=request.user %}<div class="accounttext"><b id="user-name">{{ request.user.full_name|default:request.user.email }}</b><small>{{ request.user.get_user_type_display }} Account</small></div></div>
+      </div>
+    </aside>
 
-    <main id="main" class="main">
-      {% block content %}{% endblock %}
-    </main>
+    <div class="main">
+      <header class="topbar">
+        <div class="crumb">REUSE / <strong id="crumb">{% block crumb %}Dashboard{% endblock %}</strong></div>
+        <div class="topright">
+          <a class="iconbutton {% if url_name == 'notifications' %}is-active{% endif %}" href="{% url 'notifications' %}" title="Notifications" aria-label="Notifications">{% include "partials/icon.html" with name="bell" %}<span class="ping" id="bell-badge" hidden></span></a>
+          <span class="rolepill">USER</span>
+          <div class="usermenu">
+            <button type="button" class="avatarbutton {% if url_name == 'profile' %}is-active{% endif %}" id="user-menu-btn" aria-label="Account menu" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu-list">{% include "partials/avatar.html" with u=request.user %}</button>
+            <div class="usermenu-list" id="user-menu-list" hidden>
+              <div class="usermenu-head"><b>{{ request.user.full_name|default:request.user.email }}</b><small>{{ request.user.email }}</small></div>
+              <a href="{% url 'profile' %}">My Profile</a>
+              <button type="button" id="logout-btn" data-logout>Sign Out</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main id="main" class="workspace">
+        <div class="pagehead">
+          <div><h1>{% block page_title %}{% endblock %}</h1>{% block page_sub_wrap %}<p>{% block page_sub %}{% endblock %}</p>{% endblock %}</div>
+          <div class="pageactions">{% block page_actions %}{% endblock %}</div>
+        </div>
+        {% block content %}{% endblock %}
+      </main>
+    </div>
   </div>
 
   <div id="modal-root"></div>
@@ -52,9 +75,11 @@
     REUSE.placeholder = "{% static 'img/placeholder.svg' %}";
     REUSE.requireAuth = true;
   </script>
+  <script src="{% static 'js/shell.js' %}"></script>
   <script src="{% static 'js/api.js' %}"></script>
   <script src="{% static 'js/common.js' %}"></script>
   <script src="{% static 'js/items-ui.js' %}"></script>
   {% block scripts %}{% endblock %}
 </body>
+{% endwith %}
 </html>

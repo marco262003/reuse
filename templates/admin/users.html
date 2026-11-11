@@ -1,1 +1,27 @@
-{% extends "admin/base_admin.html" %}{% block content %}<section class="admin-panel"><form class="admin-form" method="get"><input type="search" name="q" placeholder="Search user name" value="{{ q }}"><select name="type"><option value="all">All user types</option>{% for val,label in user_types %}<option value="{{ val }}" {% if user_type == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><button class="btn btn-primary btn-sm">Filter</button></form><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>User Type</th><th>Email Verified</th><th>Action</th></tr></thead><tbody>{% for u in users %}<tr><td>{{ u.full_name }}</td><td>{{ u.email }}</td><td>{{ u.mobile|default:"—" }}</td><td>{{ u.get_user_type_display }}</td><td>{{ u.is_email_verified|yesno:"Yes,No" }}</td><td><span class="admin-badge {% if u.is_active %}active{% else %}overdue{% endif %}">{% if u.is_active %}Active{% else %}Deactivated{% endif %}</span> <form method="post" action="{% url 'staff_user_toggle' u.pk %}">{% csrf_token %}<button class="btn btn-outline btn-sm" {% if u.pk == admin_user.pk %}disabled{% endif %}>{% if u.is_active %}Deactivate{% else %}Activate{% endif %}</button></form></td></tr>{% empty %}<tr><td colspan="6" class="admin-empty">No users match your search.</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% extends "admin/base_admin.html" %}
+{% block crumb %}Manage Users{% endblock %}
+{% block page_title %}User Management{% endblock %}
+{% block page_sub %}Manage registered community members.{% endblock %}
+{% block page_actions %}<a class="btn" href="{% url 'staff_user_new' %}">+ Add User</a>{% endblock %}
+{% block content %}
+<form class="toolbar" method="get">
+  <input type="search" name="q" placeholder="Search user name..." value="{{ q }}" aria-label="Search user name">
+  <select name="type" aria-label="Filter by user type"><option value="all">All user types</option>{% for val,label in user_types %}<option value="{{ val }}" {% if user_type == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+  <button class="btn secondary" type="submit">Filter</button>
+</form>
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>User Type</th><th>Email Verified</th><th>Face Login</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>{% for u in users %}<tr>
+      <td><span class="item-cell">{% include "partials/avatar.html" with u=u %}<a href="{% url 'staff_user_detail' u.pk %}">{{ u.last_name }}{% if u.last_name %}, {% endif %}{{ u.first_name }} {{ u.middle_name }} {{ u.suffix }}</a></span></td>
+      <td>{{ u.email }}</td>
+      <td>{{ u.mobile|default:"—" }}</td>
+      <td>{{ u.get_user_type_display }}</td>
+      <td>{{ u.is_email_verified|yesno:"Yes,No" }}</td>
+      <td><span class="status {% if not u.face_template %}pending{% endif %}">{% if u.face_template %}Set up{% else %}Not yet{% endif %}</span></td>
+      <td><span class="status {% if not u.is_active %}declined{% endif %}">{% if u.is_active %}Active{% else %}Deactivated{% endif %}</span></td>
+      <td><div class="rowactions"><a class="btn secondary btn-sm" href="{% url 'staff_user_detail' u.pk %}">Manage</a><form method="post" action="{% url 'staff_user_toggle' u.pk %}">{% csrf_token %}<button class="btn secondary btn-sm" type="submit" {% if u.pk == admin_user.pk %}disabled{% endif %}>{% if u.is_active %}Deactivate{% else %}Activate{% endif %}</button></form></div></td>
+    </tr>{% empty %}<tr><td colspan="8" class="empty">No users match your search.</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

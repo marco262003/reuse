@@ -34,7 +34,7 @@ class Command(BaseCommand):
         )
         if not User.objects.filter(email="demo@g.batstate-u.edu.ph").exists():
             User.objects.create_user(
-                email="demo@g.batstate-u.edu.ph", password="Demo@1234", full_name="Juan Dela Cruz",
+                email="demo@g.batstate-u.edu.ph", password="Demo@1234", first_name="Juan", last_name="Dela Cruz",
                 mobile="+639171234567", user_type="student", is_email_verified=True,
             )
         self.stdout.write(self.style.SUCCESS(

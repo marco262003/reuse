@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import api_auth, api_data, views_pages as pages, views_admin as staff_pages
+from . import api_auth, api_data, api_registration, views_pages as pages, views_admin as staff_pages
 
 urlpatterns = [
     # --- Pages -------------------------------------------------------------
@@ -15,7 +15,8 @@ urlpatterns = [
     path("browse/", pages.browse_page, name="browse"),
     path("requests/", pages.requests_page, name="requests"),
     path("borrowed/", pages.borrowed_page, name="borrowed"),
-    path("returns/", pages.returns_page, name="returns"),
+    # Items to Return merged into Borrowed Items; links in sent emails and bookmarks keep working.
+    path("returns/", RedirectView.as_view(pattern_name="borrowed", permanent=False, query_string=True), name="returns"),
     path("profile/", pages.profile_page, name="profile"),
     path("notifications/", pages.notifications_page, name="notifications"),
 
@@ -47,6 +48,14 @@ urlpatterns = [
         staff_pages.user_toggle,
         name="staff_user_toggle",
     ),
+    path("admin-dashboard/users/new/", staff_pages.user_new, name="staff_user_new"),
+    path("admin-dashboard/users/<int:user_id>/", staff_pages.user_detail, name="staff_user_detail"),
+    path("admin-dashboard/users/<int:user_id>/delete/", staff_pages.user_delete, name="staff_user_delete"),
+    path(
+        "admin-dashboard/users/<int:user_id>/face-reset/",
+        staff_pages.user_face_reset,
+        name="staff_user_face_reset",
+    ),
     path(
         "admin-dashboard/notifications/",
         staff_pages.notifications,
@@ -57,7 +66,15 @@ urlpatterns = [
     # --- Auth API ----------------------------------------------------------
     path("api/auth/register/", api_auth.register),
     path("api/auth/resend-verification/", api_auth.resend_verification),
+    path("api/registration/schema/", api_registration.schema),
+    path("api/registration/upload-id/", api_registration.upload_id),
+    path("api/registration/extract-id/", api_registration.extract_id),
     path("api/auth/login/", api_auth.login_view),
+    path("api/auth/face-scan/", api_auth.face_scan),
+    path("api/auth/face-verify/", api_auth.face_verify),
+    path("api/auth/enroll-id/", api_auth.enroll_id),
+    path("api/auth/login-code/send/", api_auth.login_code_send),
+    path("api/auth/login-code/verify/", api_auth.login_code_verify),
     path("api/auth/logout/", api_auth.logout_view),
     path("api/auth/reset/send-code/", api_auth.reset_send_code),
     path("api/auth/reset/verify-code/", api_auth.reset_verify_code),
