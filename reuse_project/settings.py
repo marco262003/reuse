@@ -7,6 +7,7 @@ Local development values are loaded from the .env file.
 """
 
 import os
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -142,6 +143,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Password rules are enforced by core.validators.
 AUTH_PASSWORD_VALIDATORS = []
 
+# New passwords are hashed with Argon2. Older PBKDF2 hashes still work and are
+# re-hashed with Argon2 the next time their owner logs in.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+if "test" in sys.argv:
+    # Hashing speed is not what the tests check; one test switches the real hashers back on.
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
 
 # --- Language and time --------------------------------------------------------
 LANGUAGE_CODE = "en-us"
@@ -154,6 +165,10 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "core.storage.VersionedStaticStorage"},
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -162,7 +177,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # --- Sessions and CSRF ---------------------------------------------------------
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_AGE = 60 * 60 * 8
+# SESSION_COOKIE_AGE is set in registration_config.py with the other sign-in timings.
 
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -201,6 +216,12 @@ else:
 # SMS requires a configured provider and API integration.
 SMS_API_KEY = os.environ.get("SMS_API_KEY", "")
 SMS_SENDER_NAME = os.environ.get("SMS_SENDER_NAME", "")
+
+
+# --- ID-first registration and face login ------------------------------------------
+# Every tunable value (thresholds, retries, file limits, session lengths, ID templates)
+# lives in registration_config.py.
+from .registration_config import *  # noqa: E402,F401,F403
 
 
 # --- REUSE business rules -----------------------------------------------------

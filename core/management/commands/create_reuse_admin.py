@@ -19,7 +19,7 @@ class Command(BaseCommand):
         if not password:
             raise CommandError("Set REUSE_ADMIN_PASSWORD before creating the administrator.")
         admin = User.objects.create_superuser(
-            email=email, password=password, full_name="REUSE Administrator", user_type="staff",
+            email=email, password=password, first_name="REUSE", last_name="Administrator", user_type="staff",
         )
         self.stdout.write(self.style.SUCCESS(f"Created staff administrator: {admin.email}"))
         if password == "admin123":

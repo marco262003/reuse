@@ -7,7 +7,8 @@ import time
 from datetime import timedelta
 
 from django.conf import settings
-from django.contrib.auth import login, logout, update_session_auth_hash
+from django.contrib.auth import logout, update_session_auth_hash
+from django.contrib.auth.hashers import make_password
 from django.core import signing
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
@@ -16,15 +17,16 @@ from django.core.mail import send_mail
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.utils import timezone
 
-from . import validators as v
+from . import face_login, registration, validators as v
 from .api import api_view, fail, ok
-from .models import Notification, PasswordResetCode, User, UserType
+from .api_registration import service_fail
+from .idscan.faces import FaceEngineUnavailable
+from .models import Notification, PasswordResetCode, User
 from .security import invalidate_user_sessions
-from .services import audit
+from .services import ServiceError, audit
 from .sms import SMSNotConfigured, send_sms
 
 log = logging.getLogger(__name__)
@@ -32,6 +34,13 @@ log = logging.getLogger(__name__)
 VERIFY_SALT = "reuse-email-verify"
 NOT_REGISTERED = "Email or mobile number is not registered."
 INVALID_CODE = "Invalid or expired verification code."
+BAD_LOGIN = "Email or password is incorrect."
+FACE_PAUSED = "We couldn't confirm it's you with the camera, so we sent a sign-in code to your school email."
+FACE_MESSAGES = {
+    "not_confirmed": "We couldn't confirm it's you. Follow the prompts in good light and try again.",
+    "no_face": "We couldn't see your face in every step. Keep your face in the frame and don't turn too far.",
+    "multiple_faces": "More than one face was in view. Only you should be in the frame.",
+}
 RESET_SESSION_SECONDS = 10 * 60
 
 
@@ -75,77 +84,15 @@ def send_verification_email(user):
 
 @api_view(["POST"], auth=False)
 def register(request):
-    d = request.data
-    full_name = v.normalize_name(d.get("full_name"))
-    email = v.normalize_email(d.get("email"))
-    mobile_raw = (d.get("mobile") or "").strip()
-    mobile = v.normalize_mobile(mobile_raw)
-    user_type = d.get("user_type")
-    password = d.get("password") or ""
-    confirm = d.get("confirm_password") or ""
-
-    errors = {}
-    if err := v.check_full_name(full_name):
-        errors["full_name"] = err
-    if err := v.check_email(email):
-        errors["email"] = err
-    elif User.objects.filter(email__iexact=email).exists():
-        errors["email"] = "This email is already registered. Log in instead."
-    if not mobile_raw:
-        errors["mobile"] = v.REQUIRED
-    elif not mobile:
-        errors["mobile"] = "Enter a valid Philippine mobile number (+63 9XX XXX XXXX)."
-    elif User.objects.filter(mobile=mobile).exists():
-        errors["mobile"] = "This mobile number is already registered."
-    if not user_type:
-        errors["user_type"] = v.REQUIRED
-    elif user_type not in UserType.values:
-        errors["user_type"] = "Select Student, Faculty or Staff."
-    if err := v.check_password(password):
-        errors["password"] = err
-    if not confirm:
-        errors["confirm_password"] = v.REQUIRED
-    elif password != confirm:
-        errors["confirm_password"] = "Passwords do not match."
-    if errors:
-        return fail("Please fix the highlighted fields.", errors=errors)
-
     try:
-        with transaction.atomic():
-            
-            user = User.objects.create_user(
-            email=email,
-            password=password,
-            full_name=full_name,
-            mobile=mobile,
-            user_type=user_type,
-            identity_verification_status="not_started",
-            identity_verified=False,
-        )
-    except IntegrityError:
-        # Re-check after the transaction has rolled back.
-        if User.objects.filter(email__iexact=email).exists():
-            return fail(
-                "Please fix the highlighted fields.",
-                errors={"email": "This email is already registered. Log in instead."},
-            )
-
-        if User.objects.filter(mobile=mobile).exists():
-            return fail(
-                "Please fix the highlighted fields.",
-                errors={"mobile": "This mobile number is already registered."},
-            )
-
-        log.exception("Registration failed due to an unexpected database constraint.")
-        return fail(
-            "We couldn't create your account due to a database conflict. Please try again.",
-            status=409,
-        )
+        user = registration.register(request, request.data)
+    except ServiceError as exc:
+        return service_fail(exc)
 
     try:
         send_verification_email(user)
     except Exception:  # noqa: BLE001
-        log.exception("Verification email failed for %s", email)
+        log.exception("Verification email failed for %s", user.email)
         return ok({
             "email_sent": False,
             "message": "Your account was created, but we couldn't send the verification email. "
@@ -182,15 +129,12 @@ def _throttle_key(request, email):
 
 @api_view(["POST"], auth=False)
 def login_view(request):
-    email = v.normalize_email(request.data.get("email"))
-    password = request.data.get("password") or ""
-
+    """Step 1 of logging in. A correct password starts a pending sign-in; the face scan finishes it."""
+    email = v.normalize_email(str(request.data.get("email") or ""))
+    password = request.data.get("password") if isinstance(request.data.get("password"), str) else ""
     errors = {}
-    user = User.objects.filter(email__iexact=email).first() if email else None
-    if user and user.is_superuser:
-        pass
-    elif err := v.check_email(email):
-        errors["email"] = err
+    if not email:
+        errors["email"] = v.REQUIRED
     if not password:
         errors["password"] = v.REQUIRED
     if errors:
@@ -201,25 +145,128 @@ def login_view(request):
     if failures >= settings.LOGIN_MAX_FAILURES:
         return fail("Too many failed attempts. Try again in 15 minutes.", 429)
 
+    user = User.objects.filter(email__iexact=email).first()
     if user is None:
+        make_password(password)  # spend the time a real check takes, so timing doesn't reveal the account
+    if user is None or not user.check_password(password):
         cache.set(key, failures + 1, 15 * 60)
-        return fail("Email is not registered.", 401)
-    if not user.check_password(password):
-        cache.set(key, failures + 1, 15 * 60)
-        return fail("Email or password is incorrect.", 401)
+        return fail(BAD_LOGIN, 401)  # the same answer for an unknown email and a wrong password
     if not user.is_active:
         return fail("This account has been deactivated. Please contact the administrator.", 403)
     if not user.is_email_verified:
         return fail("Account not verified. Please verify your email before logging in.", 403, code="unverified")
 
     cache.delete(key)
-    login(request, user)  # rotates the session id
-    
-    if user.is_superuser:
-        return ok({"redirect": "/admin-dashboard/"})
+    face_login.begin(request, user)
+    return _next_step(request, user)
 
-    return ok({"redirect": "/dashboard/"})
 
+# ---------------------------------------------------------------------------
+# Step 2 of logging in: face scan, or the email-code fallback
+# ---------------------------------------------------------------------------
+def _sign_in_again():
+    return fail("Your sign-in timed out. Please log in again.", 401, redirect="/login/")
+
+
+def _next_step(request, user):
+    """Tell the browser what this pending sign-in needs next."""
+    step = face_login.next_step(user)
+    if step == "done":
+        return ok({"redirect": face_login.complete(request, user)})
+    if step == "email_code":
+        try:
+            face_login.send_code(user)  # no new email when one was sent a moment ago
+        except ServiceError as exc:
+            return service_fail(exc)
+        return ok({"next": step, "message": FACE_PAUSED})
+    return ok({"next": step, "attempts_left": face_login.attempts_left(user)})
+
+
+@api_view(["POST"], auth=False)
+def face_scan(request):
+    user = face_login.pending_user(request)
+    if not user:
+        return _sign_in_again()
+    if face_login.next_step(user) != "face_scan":
+        return _next_step(request, user)
+    return ok(face_login.start_challenge(request, user))
+
+
+@api_view(["POST"], auth=False)
+def face_verify(request):
+    user = face_login.pending_user(request)
+    if not user:
+        return _sign_in_again()
+    if face_login.next_step(user) != "face_scan":
+        return _next_step(request, user)
+    frames = request.data.get("frames")
+    if not isinstance(frames, list) or not frames:
+        return fail("Take the face scan first.", 400)
+    try:
+        result, left = face_login.verify(request, user, str(request.data.get("challenge_id") or ""), frames)
+    except FaceEngineUnavailable:
+        log.exception("Face engine unavailable")
+        return fail("Face scan isn't available right now. Please try again in a moment.", 503)
+
+    if result == "success":
+        return ok({"redirect": face_login.complete(request, user)})
+    if result == "challenge_expired":
+        return fail("That took too long. Let's try again.", 410, code=result)
+    if result in ("no_face", "multiple_faces"):
+        return fail(FACE_MESSAGES[result], 422, code=result, attempts_left=left)
+    if left:
+        # A mismatch and a failed liveness check look the same from outside.
+        return fail(FACE_MESSAGES["not_confirmed"], 401, code="not_confirmed", attempts_left=left)
+    try:
+        face_login.send_code(user)
+    except ServiceError as exc:
+        return service_fail(exc)
+    return fail(FACE_PAUSED, 423, code="face_paused", next="email_code")
+
+
+@api_view(["POST"], auth=False)
+def enroll_id(request):
+    """An account without a reference face (older, or created by an administrator) adds its school ID."""
+    user = face_login.pending_user(request)
+    if not user:
+        return _sign_in_again()
+    try:
+        registration.enroll(request, user, request.data.get("consent"))
+    except ServiceError as exc:
+        return service_fail(exc)
+    return _next_step(request, user)
+
+
+@api_view(["POST"], auth=False)
+def login_code_send(request):
+    user = face_login.pending_user(request)
+    if not user:
+        return _sign_in_again()
+    if not face_login.has_usable_template(user):
+        return fail("Add your school ID first.", 409, next="enroll_id")
+    try:
+        wait = face_login.send_code(user)
+    except ServiceError as exc:
+        return service_fail(exc)
+    if wait:
+        return fail("Please wait before asking for another code.", 429, retry_after=wait)
+    return ok({
+        "message": "We sent a sign-in code to your school email.",
+        "cooldown": settings.RESET_RESEND_COOLDOWN_SECONDS,
+    })
+
+
+@api_view(["POST"], auth=False)
+def login_code_verify(request):
+    user = face_login.pending_user(request)
+    if not user:
+        return _sign_in_again()
+    code = str(request.data.get("code") or "").strip()
+    if not code:
+        return fail("Please fill out the required fields.", errors={"code": v.REQUIRED})
+    if not face_login.has_usable_template(user) or not face_login.check_code(request, user, code):
+        return fail(INVALID_CODE, 400, errors={"code": INVALID_CODE})
+    return ok({"redirect": face_login.complete(request, user)})
 
 
 @api_view(["POST"])
@@ -274,7 +321,7 @@ def reset_send_code(request):
         return fail(NOT_REGISTERED, 404, errors={"identifier": NOT_REGISTERED})
 
     now = timezone.now()
-    recent = PasswordResetCode.objects.filter(user=user, created_at__gte=now - timedelta(hours=1))
+    recent = PasswordResetCode.objects.filter(user=user, purpose="reset", created_at__gte=now - timedelta(hours=1))
     last = recent.first()  # newest first
     if last:
         wait = settings.RESET_RESEND_COOLDOWN_SECONDS - (now - last.created_at).total_seconds()
@@ -322,7 +369,7 @@ def reset_verify_code(request):
         return fail(NOT_REGISTERED, 404, errors={"identifier": NOT_REGISTERED})
 
     invalid = fail(INVALID_CODE, 400, errors={"code": INVALID_CODE})
-    record = PasswordResetCode.objects.filter(user=user, consumed=False).first()
+    record = PasswordResetCode.objects.filter(user=user, purpose="reset", consumed=False).first()
     if not record or record.expires_at < timezone.now() or record.attempts >= settings.RESET_MAX_ATTEMPTS:
         return invalid
     PasswordResetCode.objects.filter(pk=record.pk).update(attempts=F("attempts") + 1)

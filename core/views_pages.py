@@ -1,25 +1,39 @@
 """Pages (HTML). All data is loaded by the JavaScript through the /api/ endpoints."""
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import ensure_csrf_cookie
 
+from . import registration_fields as rf
 from .api_auth import read_verify_token, reset_session_valid
 from .models import Category, NotificationType
 from .notifications import create_notification
 
 
-def _guest_page(template):
+def _guest_page(template, context=None):
     @ensure_csrf_cookie
     def view(request):
         if request.user.is_authenticated:
             return redirect("staff_dashboard" if request.user.is_staff else "dashboard")
-        return render(request, template)
+        return render(request, template, context() if context else None)
 
     return view
 
 
-login_page = _guest_page("login.html")
-create_account_page = _guest_page("create_account.html")
+def _registration_context():
+    megabytes = settings.ID_UPLOAD_MAX_BYTES // (1024 * 1024)
+    return {
+        # The form is drawn from the field classification, and the same list drives the autofill script.
+        "id_fields": [f for f in rf.FIELDS if f.source == rf.ID],
+        "manual_fields": [f for f in rf.FIELDS if f.source == rf.MANUAL],
+        "registration_schema": rf.schema(),
+        "upload_limits": {"max_bytes": settings.ID_UPLOAD_MAX_BYTES, "types": list(settings.ID_UPLOAD_TYPES), "megabytes": megabytes},
+        "id_retention_days": settings.ID_IMAGE_RETENTION_DAYS,
+    }
+
+
+login_page = _guest_page("login.html", _registration_context)
+create_account_page = _guest_page("create_account.html", _registration_context)
 reset_password_page = _guest_page("reset_password.html")
 
 
@@ -61,6 +75,5 @@ dashboard_page = _app_page("dashboard.html")
 browse_page = _app_page("browse.html")
 requests_page = _app_page("my_requests.html")
 borrowed_page = _app_page("borrowed.html")
-returns_page = _app_page("items_to_return.html")
 profile_page = _app_page("profile.html")
 notifications_page = _app_page("notifications.html")

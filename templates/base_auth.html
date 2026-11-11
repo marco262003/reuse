@@ -3,22 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}REUSE{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>{% block title %}REUSE{% endblock %} | REUSE</title>
+  <link rel="icon" type="image/png" href="{% static 'img/reuse-logo-maroon.png' %}">
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body class="auth" data-page="{% block page %}{% endblock %}">
-  <main class="auth-shell">
-    <h1 class="auth-logo">REUSE</h1>
-    <section class="auth-card">
+  <main class="authshell">
+    <header class="authbrand">
+      <img src="{% static 'img/reuse-logo-maroon.png' %}" alt="REUSE logo">
+      <h1 class="brandtext">REUSE<small>COMMUNITY RESOURCE SYSTEM</small></h1>
+    </header>
+    <p class="authtagline">Borrow school equipment and track your returns.</p>
+    <section class="authcard {% block card_class %}{% endblock %}">
       <div id="form-alert" class="form-alert" role="alert" hidden></div>
       {% block card %}{% endblock %}
     </section>
   </main>
+  <div id="modal-root"></div>
   <script src="{% static 'js/api.js' %}"></script>
   <script src="{% static 'js/common.js' %}"></script>
   <script src="{% static 'js/auth.js' %}"></script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

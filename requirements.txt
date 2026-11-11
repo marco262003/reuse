@@ -2,3 +2,12 @@ Django>=5.1,<6.0
 psycopg[binary]>=3.2,<4.0
 Pillow>=10.0,<13.0
 python-dotenv>=1.0
+
+# ID-first registration and face login
+boto3>=1.35,<2.0                  # object storage for uploaded ID images (any S3-compatible service)
+rapidocr>=3.10,<4.0               # OCR: PaddleOCR's models, bundled, run by ONNX Runtime
+onnxruntime>=1.31,<2.0
+opencv-python-headless>=5.0,<6.0  # face detection (YuNet) and matching (SFace), image clean-up
+pypdfium2>=5.0,<6.0               # turns a PDF's first page into an image
+cryptography>=50.0                # encrypts stored face templates
+argon2-cffi>=25.1                 # password hashing

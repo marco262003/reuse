@@ -1,1 +1,27 @@
-{% extends "admin/base_admin.html" %}{% block content %}<section class="admin-panel"><form class="admin-form" method="get"><input type="search" name="q" placeholder="Search item, requester, or ID" value="{{ q }}"><select name="status"><option value="all">All statuses</option>{% for val,label in statuses %}<option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><button class="btn btn-primary btn-sm">Filter</button></form><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Request ID</th><th>Item / Qty</th><th>Requester</th><th>Borrow</th><th>Return</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead><tbody>{% for r in requests %}<tr><td><strong>{{ r.request_id }}</strong>{% if r.approval_id %}<br><small>{{ r.approval_id }}</small>{% endif %}</td><td>{{ r.item.name }}<br>×{{ r.quantity }}</td><td>{{ r.user.full_name }}<br><small>{{ r.user.email }}</small></td><td>{{ r.borrow_at|date:"M d, Y · g:i A" }}</td><td>{{ r.return_at|date:"M d, Y · g:i A" }}</td><td>{{ r.purpose|default:r.get_reason_display|truncatechars:100 }}</td><td><span class="admin-badge {{ r.status }}">{{ r.get_status_display }}</span>{% if r.rejection_reason %}<br><small>{{ r.rejection_reason }}</small>{% endif %}</td><td><div class="admin-actions">{% if r.status == 'pending' %}<form method="post" action="{% url 'staff_request_action' r.pk 'approve' %}">{% csrf_token %}<button class="btn btn-primary btn-sm">Approve</button></form><form method="post" action="{% url 'staff_request_action' r.pk 'reject' %}">{% csrf_token %}<input type="text" name="rejection_reason" placeholder="Reason required" required maxlength="300"><button class="btn btn-outline btn-sm">Reject</button></form>{% elif r.status == 'approved' %}<form method="post" action="{% url 'staff_request_action' r.pk 'pickup' %}">{% csrf_token %}<button class="btn btn-primary btn-sm">Confirm Pickup</button></form><form method="post" action="{% url 'staff_request_action' r.pk 'cancel' %}">{% csrf_token %}<button class="btn btn-outline btn-sm">Cancel</button></form>{% else %}<span class="admin-muted">No action</span>{% endif %}</div></td></tr>{% empty %}<tr><td colspan="8" class="admin-empty">No requests found.</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% extends "admin/base_admin.html" %}
+{% block title %}Borrow Requests{% endblock %}
+{% block crumb %}Borrow Requests{% endblock %}
+{% block page_title %}Borrow Request Management{% endblock %}
+{% block page_sub %}Review and monitor borrowing requests.{% endblock %}
+{% block content %}
+<form class="toolbar" method="get">
+  <input type="search" name="q" placeholder="Search item, requester, or ID..." value="{{ q }}" aria-label="Search item, requester, or ID">
+  <select name="status" aria-label="Filter by status"><option value="all">All statuses</option>{% for val,label in statuses %}<option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+  <button class="btn secondary" type="submit">Filter</button>
+</form>
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Reference</th><th>Resource</th><th>Requester</th><th>Borrow Date</th><th>Return Date</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>{% for r in requests %}<tr>
+      <td><strong>{{ r.request_id }}</strong>{% if r.approval_id %}<small>{{ r.approval_id }}</small>{% endif %}</td>
+      <td>{{ r.item.name }}<small>×{{ r.quantity }}</small></td>
+      <td>{{ r.user.full_name }}<small>{{ r.user.email }}</small></td>
+      <td>{{ r.borrow_at|date:"M d, Y · g:i A" }}</td>
+      <td>{{ r.return_at|date:"M d, Y · g:i A" }}</td>
+      <td>{{ r.purpose|default:r.get_reason_display|truncatechars:100 }}</td>
+      <td><span class="status {{ r.status }}">{{ r.get_status_display }}</span>{% if r.rejection_reason %}<small>{{ r.rejection_reason }}</small>{% endif %}</td>
+      <td><div class="rowactions">{% if r.status == 'pending' %}<form method="post" action="{% url 'staff_request_action' r.pk 'approve' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Approve</button></form><details class="inline-reject"><summary class="btn secondary btn-sm">Reject</summary><form method="post" action="{% url 'staff_request_action' r.pk 'reject' %}">{% csrf_token %}<input type="text" name="rejection_reason" placeholder="Reason required" aria-label="Reason for rejection" required maxlength="300"><button class="btn danger btn-sm" type="submit">Confirm Reject</button></form></details>{% elif r.status == 'approved' %}<form method="post" action="{% url 'staff_request_action' r.pk 'pickup' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Confirm Pickup</button></form><form method="post" action="{% url 'staff_request_action' r.pk 'cancel' %}">{% csrf_token %}<button class="btn secondary btn-sm" type="submit">Cancel</button></form>{% else %}<span class="muted">—</span>{% endif %}</div></td>
+    </tr>{% empty %}<tr><td colspan="8" class="empty">No requests found.</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

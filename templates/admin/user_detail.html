@@ -1,0 +1,61 @@
+{% extends "admin/base_admin.html" %}
+{% block crumb %}Manage Users / {{ subject.full_name|default:subject.email }}{% endblock %}
+{% block page_title %}{{ subject.full_name|default:subject.email }}{% endblock %}
+{% block page_sub %}{{ subject.get_user_type_display }} · {{ subject.email }}{% endblock %}
+{% block content %}
+<a class="backlink" href="{% url 'staff_users' %}">&larr; All users</a>
+
+<section class="panel">
+  <div class="panelhead"><h2>Account</h2><small>Name, contact and user type</small></div>
+  <form method="post">{% csrf_token %}
+    {% include "admin/partials/user_fields.html" with first_name=subject.first_name middle_name=subject.middle_name last_name=subject.last_name suffix=subject.suffix email=subject.email mobile=subject.mobile user_type=subject.user_type %}
+    <div class="formactions"><button class="btn" type="submit">Save Account</button></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panelhead"><h2>From the school ID</h2><small>Read during registration</small></div>
+  <dl class="facts">
+    <div><dt>School ID number</dt><dd>{{ subject.student_id_number|default:"—" }}</dd></div>
+    <div><dt>Course / program</dt><dd>{{ subject.program|default:"—" }}</dd></div>
+    <div><dt>Year level</dt><dd>{{ subject.year_level|default:"—" }}</dd></div>
+    <div><dt>College / department</dt><dd>{{ subject.college|default:"—" }}</dd></div>
+    <div><dt>Date of birth</dt><dd>{{ subject.date_of_birth|date:"M j, Y"|default:"—" }}</dd></div>
+    <div><dt>ID valid until</dt><dd>{{ subject.id_valid_until|default:"—" }}</dd></div>
+  </dl>
+</section>
+
+<section class="panel">
+  <div class="panelhead"><h2>Face login <span class="status {% if not face_ready %}pending{% endif %}">{% if face_ready %}Set up{% else %}Not set up{% endif %}</span></h2></div>
+  <p class="panelnote">
+    {% if face_ready %}Set up {{ subject.face_enrolled_at|date:"M j, Y g:i A" }} from the portrait on the school ID. Only an encrypted face template is stored, not a photo.
+    {% elif subject.face_template %}The stored face template can't be used with the current face engine or key. The person will be asked for their school ID at their next login.
+    {% else %}The person will be asked for their school ID at their next login.{% endif %}
+    {% if face_ready %}{{ scans_left }} of {{ max_scans }} face scans left before login switches to an email code.{% endif %}
+  </p>
+  {% if subject.face_template %}<form method="post" action="{% url 'staff_user_face_reset' subject.pk %}">{% csrf_token %}<button class="btn secondary" type="submit" onclick="return confirm('Forget this person\'s face template? They will add their school ID again at their next login.')">Reset Face Login</button></form>{% endif %}
+</section>
+
+<section class="panel">
+  <div class="panelhead"><h2>Verification log</h2><small>Last 20 records</small></div>
+  <p class="panelnote">The last 20 ID reads, face scans and email codes. No images or face templates are kept.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>When</th><th>What</th><th>Result</th><th>Similarity</th><th>IP address</th></tr></thead>
+      <tbody>{% for r in records %}<tr>
+        <td>{{ r.created_at|date:"M j, Y g:i A" }}</td>
+        <td>{{ r.get_kind_display }}</td>
+        <td>{{ r.get_outcome_display }}</td>
+        <td>{% if r.similarity is not None %}{{ r.similarity|floatformat:2 }}{% else %}—{% endif %}</td>
+        <td>{{ r.ip|default:"—" }}</td>
+      </tr>{% empty %}<tr><td colspan="5" class="empty">Nothing yet.</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panelhead"><h2>Delete account</h2></div>
+  <p class="panelnote">Accounts with borrowing history can only be deactivated, so their records stay intact.</p>
+  <form method="post" action="{% url 'staff_user_delete' subject.pk %}">{% csrf_token %}<button class="btn danger" type="submit" {% if subject.pk == admin_user.pk %}disabled{% endif %} onclick="return confirm('Permanently delete this account and its face template?')">Delete Account</button></form>
+</section>
+{% endblock %}

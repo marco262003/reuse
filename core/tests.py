@@ -4,7 +4,7 @@ import re
 from datetime import timedelta
 
 from django.core import mail
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.utils import timezone
 
 from . import services
@@ -31,7 +31,7 @@ def schedule(hours_from_now=2, length_hours=48):
 
 def make_user(email="ana@g.batstate-u.edu.ph", mobile="+639171111111", verified=True):
     return User.objects.create_user(
-        email=email, password=PASSWORD, full_name="Ana Reyes Cruz", mobile=mobile,
+        email=email, password=PASSWORD, first_name="Ana", middle_name="Reyes", last_name="Cruz", mobile=mobile,
         user_type="student", is_email_verified=verified,
     )
 
@@ -42,63 +42,32 @@ def request_payload(item, quantity=1, **extra):
     return data
 
 
-class RegistrationAndLoginTests(TestCase):
-    def register(self, **overrides):
-        data = {
-            "full_name": "Ana Reyes Cruz", "email": "ana@g.batstate-u.edu.ph", "mobile": "0917 111 1111",
-            "user_type": "student", "password": PASSWORD, "confirm_password": PASSWORD,
-        }
-        data.update(overrides)
-        return post(self.client, "/api/auth/register/", data)
+class LoginPasswordTests(TestCase):
+    """The password step only. Registration is in tests_registration.py, the face step in tests_face_login.py."""
 
-    def test_register_verify_then_login(self):
-        res = self.register()
-        self.assertEqual(res.status_code, 201)
-        self.assertEqual(res.json()["message"], "A verification link has been sent to your school email.")
-        user = User.objects.get(email="ana@g.batstate-u.edu.ph")
-        self.assertFalse(user.is_email_verified)
-        self.assertEqual(user.mobile, "+639171111111")  # stored in one consistent format
+    def test_unknown_email_and_wrong_password_look_the_same(self):
+        make_user()
+        for email in ("nobody@g.batstate-u.edu.ph", "ana@g.batstate-u.edu.ph", "ana@gmail.com"):
+            res = post(self.client, "/api/auth/login/", {"email": email, "password": "wrong"})
+            self.assertEqual((res.status_code, res.json()["message"]), (401, "Email or password is incorrect."), email)
+            self.assertEqual(res.json()["errors"], {})
 
+    def test_unverified_is_only_revealed_after_a_correct_password(self):
+        user = make_user(verified=False)
+        res = post(self.client, "/api/auth/login/", {"email": user.email, "password": "wrong"})
+        self.assertEqual(res.json()["message"], "Email or password is incorrect.")
         res = post(self.client, "/api/auth/login/", {"email": user.email, "password": PASSWORD})
         self.assertEqual(res.status_code, 403)
         self.assertEqual(res.json()["message"], "Account not verified. Please verify your email before logging in.")
 
-        link = re.search(r"/verify-email/([^/\s]+)/", mail.outbox[0].body).group(1)
-        res = self.client.get(f"/verify-email/{link}/")
+    def test_email_verification_link(self):
+        user = make_user(verified=False)
+        from .api_auth import make_verify_token
+        res = self.client.get(f"/verify-email/{make_verify_token(user)}/")
         self.assertEqual(res.status_code, 302)
+        user.refresh_from_db()
+        self.assertTrue(user.is_email_verified)
         self.assertTrue(Notification.objects.filter(user=user, type=NotificationType.ACCOUNT_VERIFIED).exists())
-
-        res = post(self.client, "/api/auth/login/", {"email": user.email, "password": PASSWORD})
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["redirect"], "/dashboard/")
-
-    def test_login_messages(self):
-        make_user()
-        res = post(self.client, "/api/auth/login/", {"email": "nobody@g.batstate-u.edu.ph", "password": "x"})
-        self.assertEqual(res.json()["message"], "Email is not registered.")
-        res = post(self.client, "/api/auth/login/", {"email": "ana@g.batstate-u.edu.ph", "password": "wrong"})
-        self.assertEqual(res.json()["message"], "Email or password is incorrect.")
-        res = post(self.client, "/api/auth/login/", {"email": "ana@gmail.com", "password": "x"})
-        self.assertIn("email", res.json()["errors"])
-
-    def test_registration_validation(self):
-        res = self.register(email="ana@gmail.com", full_name="Ana 123", password="weak",
-                            confirm_password="other", mobile="12345", user_type="")
-        errors = res.json()["errors"]
-        for field in ("email", "full_name", "password", "confirm_password", "mobile", "user_type"):
-            self.assertIn(field, errors)
-        self.assertEqual(User.objects.count(), 0)
-
-    def test_accented_and_hyphenated_names_are_accepted(self):
-        res = self.register(full_name="Niño Dela Peña-O'Brien")
-        self.assertEqual(res.status_code, 201)
-
-    def test_duplicate_email_is_rejected(self):
-        make_user()
-        res = self.register()
-        self.assertEqual(res.status_code, 400)
-        self.assertIn("email", res.json()["errors"])
-        self.assertEqual(User.objects.count(), 1)
 
     def test_deactivated_account_cannot_log_in(self):
         user = make_user()
@@ -158,7 +127,7 @@ class InventoryFlowTests(TestCase):
     def setUp(self):
         self.user = make_user()
         self.other = make_user("ben@g.batstate-u.edu.ph", "+639172222222")
-        self.admin = User.objects.create_superuser("admin@reuse.local", "Admin@12345", full_name="Admin User")
+        self.admin = User.objects.create_superuser("admin@reuse.local", "Admin@12345", first_name="Admin", last_name="User")
         self.item = Item.objects.create(name="Projector", category="av", total_qty=3)
         self.client.force_login(self.user)
 
@@ -207,6 +176,20 @@ class InventoryFlowTests(TestCase):
         self.assertEqual((self.item.borrowed_qty, self.item.available_qty), (0, 3))
         self.assertTrue(Notification.objects.filter(user=self.user, type=NotificationType.RETURN_CONFIRMED).exists())
         self.assertEqual(self.client.get("/api/returns/").json()["returns"], [])
+
+    def test_dashboard_lists_reservations_ready_for_pickup(self):
+        req = BorrowRequest.objects.get(request_id=self.submit().json()["request"]["id"])
+        self.assertEqual(self.client.get("/api/dashboard/").json()["ready_for_pickup"], [])
+        services.approve_request(req.pk, self.admin)
+        ready = self.client.get("/api/dashboard/").json()["ready_for_pickup"]
+        self.assertEqual([r["id"] for r in ready], [req.request_id])
+        services.confirm_pickup(req.pk, self.admin)
+        self.assertEqual(self.client.get("/api/dashboard/").json()["ready_for_pickup"], [])
+
+    def test_old_returns_links_go_to_borrowed_page(self):
+        res = self.client.get("/returns/?open=B00001")
+        self.assertRedirects(res, "/borrowed/?open=B00001", fetch_redirect_response=False)
+        self.assertEqual(self.client.get("/borrowed/").status_code, 200)
 
     def test_cannot_reserve_more_than_available(self):
         first = BorrowRequest.objects.get(request_id=self.submit(quantity=3).json()["request"]["id"])
@@ -267,7 +250,7 @@ class InventoryFlowTests(TestCase):
 class AvailabilityNotificationTests(TestCase):
     def setUp(self):
         self.user = make_user()
-        self.admin = User.objects.create_superuser("admin@reuse.local", "Admin@12345", full_name="Admin User")
+        self.admin = User.objects.create_superuser("admin@reuse.local", "Admin@12345", first_name="Admin", last_name="User")
         self.item = Item.objects.create(name="Wireless Presenter", category="av", total_qty=1, repair_qty=1)
         self.client.force_login(self.user)
 
@@ -317,7 +300,7 @@ class DueNotificationCommandTests(TestCase):
         from django.core.management import call_command
 
         user = make_user()
-        admin = User.objects.create_superuser("admin@reuse.local", "Admin@12345", full_name="Admin User")
+        admin = User.objects.create_superuser("admin@reuse.local", "Admin@12345", first_name="Admin", last_name="User")
         item = Item.objects.create(name="Projector", category="av", total_qty=2)
         for hours in (3, 5):
             req = BorrowRequest.objects.create(
@@ -339,7 +322,7 @@ class DueNotificationCommandTests(TestCase):
 class CustomAdminPagesTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser(
-            email="admin@reuse.com", password="Admin@1234", full_name="REUSE Administrator",
+            email="admin@reuse.com", password="Admin@1234", first_name="REUSE", last_name="Administrator",
             user_type="staff",
         )
         self.client.force_login(self.admin)
@@ -352,6 +335,21 @@ class CustomAdminPagesTests(TestCase):
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
+
+    def test_requests_list_puts_pending_first(self):
+        user = make_user()
+        item = Item.objects.create(name="Projector", category="av", total_qty=3)
+        client = Client()
+        client.force_login(user)
+        first = post(client, "/api/requests/", request_payload(item)).json()["request"]["id"]
+        second = post(client, "/api/requests/", request_payload(item, 2)).json()["request"]["id"]
+        services.approve_request(BorrowRequest.objects.get(request_id=second).pk, self.admin)
+        listed = [r.request_id for r in self.client.get("/admin-dashboard/requests/").context["requests"]]
+        self.assertEqual(listed, [first, second])
+
+    def test_static_urls_change_with_the_file(self):
+        html = self.client.get("/admin-dashboard/").content.decode()
+        self.assertRegex(html, r"/static/css/style\.css\?v=\d+")
 
     def test_admin_can_add_and_archive_inventory_item(self):
         response = self.client.post("/admin-dashboard/items/save/", {

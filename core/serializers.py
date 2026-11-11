@@ -137,11 +137,13 @@ def notification_dict(note):
                      NotificationType.RESERVATION_CANCELED) and note.request_id:
         link = f"/requests/?open={note.request.request_id}"
     elif note.type in (NotificationType.DUE_SOON, NotificationType.OVERDUE) and note.borrowing_id:
-        link = f"/returns/?open={note.borrowing.borrowing_id}"
-    elif note.type == NotificationType.RETURN_CONFIRMED and note.borrowing_id:
         link = f"/borrowed/?open={note.borrowing.borrowing_id}"
+    elif note.type == NotificationType.RETURN_CONFIRMED and note.borrowing_id:
+        link = f"/borrowed/?tab=history&open={note.borrowing.borrowing_id}"
     elif note.type == NotificationType.ITEM_AVAILABLE and note.item_id:
         link = f"/browse/?item={note.item_id}"
+    elif note.type == NotificationType.SIGN_IN_ALERT:
+        link = "/profile/"
     return {
         "id": note.pk,
         "type": note.type,
@@ -162,4 +164,5 @@ def user_dict(user):
         "user_type": user.user_type,
         "user_type_label": user.get_user_type_display(),
         "profile_image_url": user.profile_image.url if user.profile_image else "",
+        "face_login": bool(user.face_template),
     }

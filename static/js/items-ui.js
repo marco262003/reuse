@@ -47,8 +47,8 @@
         : '<button type="button" class="btn btn-primary" data-act="request">Request Item</button>';
     } else {
       actions =
-        `<button type="button" class="btn btn-primary btn-sm" data-act="notify" ${item.subscribed ? "disabled" : ""}>${item.subscribed ? "Notification On" : "Notify When Available"}</button>` +
-        '<button type="button" class="btn btn-primary" disabled>Request Item</button>';
+        '<button type="button" class="btn btn-outline" disabled>Request Item</button>' +
+        `<button type="button" class="btn btn-primary" data-act="notify" ${item.subscribed ? "disabled" : ""}>${item.subscribed ? "Notification On" : "Notify When Available"}</button>`;
     }
 
     const modal = R.modal.open(
@@ -96,31 +96,31 @@
     const editing = Boolean(existing);
     const max = Math.max(1, item.available_qty);
     const qty = Math.min(existing ? existing.quantity : 1, max);
-    const today = fmt.toDateInput(new Date());
+    const today = `${fmt.toDateInput(new Date())}T00:00`;
+    const moment = (iso) => `${fmt.toDateInput(iso)}T${fmt.toTimeInput(iso)}`;
     const v = existing
       ? {
-          bd: fmt.toDateInput(existing.borrow_at), bt: fmt.toTimeInput(existing.borrow_at),
-          rd: fmt.toDateInput(existing.return_at), rt: fmt.toTimeInput(existing.return_at),
+          borrow: moment(existing.borrow_at), ret: moment(existing.return_at),
           reason: existing.reason, other: existing.reason_other, details: existing.details,
         }
-      : { bd: "", bt: "", rd: "", rt: "", reason: "", other: "", details: "" };
+      : { borrow: "", ret: "", reason: "", other: "", details: "" };
 
     const modal = R.modal.open(
       `<form id="request-form" novalidate>
          <h2 class="modal-title caps">Request “${esc(item.name)}”</h2>
          <div class="form-grid">
-           <div class="form-field" data-field="borrow_date"><label for="rf-bd">Borrow Date</label>
-             <input class="control" id="rf-bd" name="borrow_date" type="date" min="${today}" value="${esc(v.bd)}"><p class="field-error"></p></div>
-           <div class="form-field" data-field="return_date"><label for="rf-rd">Return Date</label>
-             <input class="control" id="rf-rd" name="return_date" type="date" min="${today}" value="${esc(v.rd)}"><p class="field-error"></p></div>
-           <div class="form-field" data-field="borrow_time"><label for="rf-bt">Borrow Time</label>
-             <input class="control" id="rf-bt" name="borrow_time" type="time" value="${esc(v.bt)}"><p class="field-error"></p></div>
-           <div class="form-field" data-field="return_time"><label for="rf-rt">Return Time</label>
-             <input class="control" id="rf-rt" name="return_time" type="time" value="${esc(v.rt)}"><p class="field-error"></p></div>
+           <div class="form-field" data-field="borrow_date"><label for="rf-borrow">Borrow Date and Time</label>
+             <input class="control" id="rf-borrow" name="borrow_at" type="datetime-local" min="${today}" value="${esc(v.borrow)}"><p class="field-error"></p></div>
+           <div class="form-field" data-field="return_date"><label for="rf-return">Return Date and Time</label>
+             <input class="control" id="rf-return" name="return_at" type="datetime-local" min="${today}" value="${esc(v.ret)}"><p class="field-error"></p></div>
          </div>
          <div class="form-field" data-field="quantity"><label for="rf-qty">Quantity</label>
-           <div class="qty-row"><input id="rf-qty" name="quantity" type="range" min="1" max="${max}" value="${qty}">
-             <output for="rf-qty" id="rf-qty-out">${qty}/${max}</output></div><p class="field-error"></p></div>
+           <div class="qty-row">
+             <button type="button" class="qty-btn" data-step="-1" aria-label="Decrease quantity">−</button>
+             <input class="control" id="rf-qty" name="quantity" type="number" inputmode="numeric" min="1" max="${max}" value="${qty}">
+             <button type="button" class="qty-btn" data-step="1" aria-label="Increase quantity">+</button>
+             <span class="muted">${max} available</span>
+           </div><p class="field-error"></p></div>
          <div class="form-field" data-field="reason"><label for="rf-reason">Reason for Borrowing</label>
            <select class="control" id="rf-reason" name="reason"><option value="">Select a reason</option>
              ${REASONS.map(([val, label]) => `<option value="${val}" ${v.reason === val ? "selected" : ""}>${label}</option>`).join("")}
@@ -137,8 +137,12 @@
 
     const form = modal.body.querySelector("#request-form");
     const alertBox = form.querySelector("#rf-alert");
-    const slider = form.elements.quantity;
-    slider.addEventListener("input", () => { form.querySelector("#rf-qty-out").textContent = `${slider.value}/${max}`; });
+    const quantity = form.elements.quantity;
+    const setQuantity = (n) => { quantity.value = Math.min(max, Math.max(1, Number(n) || 1)); };
+    quantity.addEventListener("change", () => setQuantity(quantity.value));
+    form.querySelectorAll("[data-step]").forEach((btn) => {
+      btn.addEventListener("click", () => setQuantity(Number(quantity.value) + Number(btn.dataset.step)));
+    });
     form.elements.reason.addEventListener("change", (e) => {
       form.querySelector("#rf-other-wrap").hidden = e.target.value !== "other";
     });
@@ -147,21 +151,24 @@
       e.preventDefault();
       R.clearErrors(form);
       R.alert(alertBox, "");
+      setQuantity(quantity.value);
+      const [borrowDate = "", borrowTime = ""] = form.elements.borrow_at.value.split("T");
+      const [returnDate = "", returnTime = ""] = form.elements.return_at.value.split("T");
       const body = {
         item_id: item.id,
-        quantity: Number(slider.value),
-        borrow_date: form.elements.borrow_date.value, borrow_time: form.elements.borrow_time.value,
-        return_date: form.elements.return_date.value, return_time: form.elements.return_time.value,
+        quantity: Number(quantity.value),
+        borrow_date: borrowDate, borrow_time: borrowTime,
+        return_date: returnDate, return_time: returnTime,
         reason: form.elements.reason.value, reason_other: form.elements.reason_other.value.trim(),
         details: form.elements.details.value.trim(),
       };
 
       // Quick checks for a faster answer. The server repeats every check.
       const errors = {};
-      ["borrow_date", "borrow_time", "return_date", "return_time"].forEach((k) => { if (!body[k]) errors[k] = "Please fill out this field."; });
+      ["borrow_date", "return_date"].forEach((k) => { if (!body[k]) errors[k] = "Please fill out this field."; });
       if (!body.reason) errors.reason = "Select a reason for borrowing.";
       if (body.reason === "other" && body.reason_other.length < 3) errors.reason_other = "Tell us the specific reason.";
-      if (!errors.borrow_date && !errors.borrow_time && !errors.return_date && !errors.return_time) {
+      if (!errors.borrow_date && !errors.return_date) {
         if (new Date(`${body.return_date}T${body.return_time}`) <= new Date(`${body.borrow_date}T${body.borrow_time}`)) {
           errors.return_date = "The return date and time must be after the borrow date and time.";
         }

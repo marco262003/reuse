@@ -1,8 +1,72 @@
-{% extends "admin/base_admin.html" %}{% block content %}
-<section class="admin-grid"><div class="admin-card"><small>Total Items</small><strong>{{ total_items }}</strong></div><div class="admin-card"><small>Pending Requests</small><strong>{{ pending_requests }}</strong></div><div class="admin-card"><small>Active Borrowings</small><strong>{{ active_borrowings }}</strong></div><div class="admin-card"><small>Overdue Returns</small><strong class="{% if overdue_returns %}admin-danger{% endif %}">{{ overdue_returns }}</strong></div></section>
-<section class="admin-panel"><h2>Quick Actions</h2><div class="admin-quick"><a href="{% url 'staff_items' %}">+ Add / manage items</a><a href="{% url 'staff_requests' %}?status=pending">Review pending requests</a><a href="{% url 'staff_borrowings' %}?status=overdue">Check overdue returns</a><a href="{% url 'staff_users' %}">Manage users</a></div></section>
-<section class="admin-panel"><h2>Recent Borrowing Requests</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Request ID</th><th>Item</th><th>Requester</th><th>Quantity</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead><tbody>{% for r in recent_requests %}<tr><td>{{ r.request_id }}</td><td>{{ r.item.name }}</td><td>{{ r.user.full_name }}</td><td>{{ r.quantity }}</td><td>{{ r.created_at|date:"M d, Y" }}</td><td><span class="admin-badge {{ r.status }}">{{ r.get_status_display }}</span></td><td><a href="{% url 'staff_requests' %}?q={{ r.request_id }}">View</a></td></tr>{% empty %}<tr><td colspan="7" class="admin-empty">No requests yet.</td></tr>{% endfor %}</tbody></table></div></section>
-<section class="admin-panel"><h2>Overdue Returns</h2><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Borrowing ID</th><th>Item</th><th>Borrower</th><th>Due date</th><th></th></tr></thead><tbody>{% for b in overdue %}<tr><td>{{ b.borrowing_id }}</td><td>{{ b.item.name }}</td><td>{{ b.user.full_name }}</td><td class="admin-danger">{{ b.due_at|date:"M d, Y · g:i A" }}</td><td><a href="{% url 'staff_borrowings' %}?q={{ b.borrowing_id }}">View</a></td></tr>{% empty %}<tr><td colspan="5" class="admin-empty">No overdue items. Nice!</td></tr>{% endfor %}</tbody></table></div></section>
-<section class="admin-panel"><h2>Monthly Borrowing Activity</h2>{% if monthly %}{% for m in monthly %}<div class="admin-bar-row"><span>{{ m.picked_up_at__date|date:"M d" }}</span><div class="admin-bar"><span style="width:{% widthratio m.total 10 100 %}%"></span></div><strong>{{ m.total }}</strong></div>{% endfor %}{% else %}<p class="admin-empty">No borrowing activity this month yet.</p>{% endif %}</section>
-<section class="admin-grid" style="margin-top:20px"><div class="admin-card"><small>Available Units</small><strong>{{ available_units }}</strong></div><div class="admin-card"><small>Borrowed Units</small><strong>{{ borrowed_units }}</strong></div><div class="admin-card"><small>Under Repair</small><strong>{{ repair_units }}</strong></div><div class="admin-card"><small>Needs Attention</small><strong class="{% if overdue_returns or pending_requests %}admin-warning{% endif %}">{{ overdue_returns|add:pending_requests }}</strong></div></section>
-<section class="admin-panel"><h2>Request Status Summary</h2>{% for r in request_summary %}<div class="admin-bar-row"><span>{{ r.label }}</span><div class="admin-bar"><span style="width:{% widthratio r.count 10 100 %}%"></span></div><strong>{{ r.count }}</strong></div>{% endfor %}</section>{% endblock %}
+{% extends "admin/base_admin.html" %}
+{% load static %}
+{% block page_title %}System Overview{% endblock %}
+{% block page_sub %}Monitor your resource-sharing community and system performance.{% endblock %}
+{% block page_actions %}<a class="btn" href="{% url 'staff_items' %}#resource-form">+ Add Resource</a>{% endblock %}
+{% block content %}
+<section class="stats" aria-label="Summary">
+  <a class="stat" href="{% url 'staff_items' %}"><div class="stathead">Total Items<span class="staticon">{% include "partials/icon.html" with name="items" %}</span></div><div class="statnum">{{ total_items }}</div><div class="statfoot">Active listings</div></a>
+  <a class="stat" href="{% url 'staff_requests' %}?status=pending"><div class="stathead">Pending Requests<span class="staticon">{% include "partials/icon.html" with name="requests" %}</span></div><div class="statnum">{{ pending_requests }}</div><div class="statfoot {% if pending_requests %}warn{% endif %}">{% if pending_requests %}Requires review{% else %}Nothing waiting{% endif %}</div></a>
+  <a class="stat" href="{% url 'staff_borrowings' %}?status=active"><div class="stathead">Active Borrowings<span class="staticon">{% include "partials/icon.html" with name="borrow" %}</span></div><div class="statnum">{{ active_borrowings }}</div><div class="statfoot">Current transactions</div></a>
+  <a class="stat" href="{% url 'staff_borrowings' %}?status=overdue"><div class="stathead">Overdue Returns<span class="staticon">{% include "partials/icon.html" with name="history" %}</span></div><div class="statnum">{{ overdue_returns }}</div><div class="statfoot {% if overdue_returns %}alert{% endif %}">{% if overdue_returns %}Requires attention{% else %}All returns on time{% endif %}</div></a>
+</section>
+
+<div class="grid2">
+  <section class="panel" aria-labelledby="h-activity">
+    <div class="panelhead"><h2 id="h-activity">Borrowing Activity</h2><small>Pickups this month</small></div>
+    <div data-linechart>
+      <ol class="chartdata">{% for m in monthly %}<li data-label="{{ m.picked_up_at__date|date:'M d' }}" data-value="{{ m.total }}">{{ m.picked_up_at__date|date:"M d" }}: {{ m.total }}</li>{% endfor %}</ol>
+      {% if not monthly %}<p class="empty">No borrowing activity this month yet.</p>{% endif %}
+    </div>
+  </section>
+  <section class="panel" aria-labelledby="h-outcomes">
+    <div class="panelhead"><h2 id="h-outcomes">Request Outcomes</h2><small>Status distribution</small></div>
+    <div class="donutrow" data-donut>
+      <div class="donut"><div class="donutcenter"><span data-donut-total>–</span><small>Requests</small></div></div>
+      <ul class="legend">{% for r in request_summary %}<li data-value="{{ r.count }}"><i class="dot"></i>{{ r.label }}<b>{{ r.count }}</b></li>{% endfor %}</ul>
+    </div>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="panel" aria-labelledby="h-actions">
+    <div class="panelhead"><h2 id="h-actions">Recommended Actions</h2><small>Suggested next steps</small></div>
+    <a class="suggestion" href="{% url 'staff_requests' %}?status=pending"><span class="suggestionmark">›</span><div class="grow"><b>Pending approvals</b>Review requests waiting for administrator action.</div>{% if pending_requests %}<span class="status pending">{{ pending_requests }} pending</span>{% endif %}</a>
+    <a class="suggestion" href="{% url 'staff_borrowings' %}?status=overdue"><span class="suggestionmark">›</span><div class="grow"><b>Return monitoring</b>Check overdue returns and follow up with borrowers.</div>{% if overdue_returns %}<span class="status declined">{{ overdue_returns }} overdue</span>{% endif %}</a>
+    <a class="suggestion" href="{% url 'staff_items' %}"><span class="suggestionmark">›</span><div class="grow"><b>Inventory planning</b>Add new resources or update stock and units under repair.</div></a>
+    <a class="suggestion" href="{% url 'staff_users' %}"><span class="suggestionmark">›</span><div class="grow"><b>Manage users</b>Review community accounts, verification and face login.</div></a>
+  </section>
+  <section class="panel" aria-labelledby="h-inventory">
+    <div class="panelhead"><h2 id="h-inventory">Inventory Snapshot</h2><small>Units across active items</small></div>
+    <div class="suggestion"><span class="suggestionmark">{% include "partials/icon.html" with name="check" %}</span><div class="grow"><b>Available Units</b>Ready to be requested</div><span class="suggestionvalue">{{ available_units }}</span></div>
+    <div class="suggestion"><span class="suggestionmark">{% include "partials/icon.html" with name="borrow" %}</span><div class="grow"><b>Borrowed Units</b>Currently with borrowers</div><span class="suggestionvalue">{{ borrowed_units }}</span></div>
+    <div class="suggestion"><span class="suggestionmark">{% include "partials/icon.html" with name="settings" %}</span><div class="grow"><b>Under Repair</b>Not available for borrowing</div><span class="suggestionvalue">{{ repair_units }}</span></div>
+    <div class="suggestion"><span class="suggestionmark">{% include "partials/icon.html" with name="alert" %}</span><div class="grow"><b>Needs Attention</b>Pending requests and overdue returns</div><span class="suggestionvalue {% if overdue_returns or pending_requests %}text-warn{% endif %}">{{ overdue_returns|add:pending_requests }}</span></div>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="panel" aria-labelledby="h-recent">
+    <div class="panelhead"><h2 id="h-recent">Recent Borrowing Requests</h2><a href="{% url 'staff_requests' %}">View all</a></div>
+    {% for r in recent_requests %}
+    <div class="suggestion">
+      {% include "partials/avatar.html" with u=r.user %}
+      <div class="grow"><b>{{ r.user.full_name }}</b>{{ r.request_id }} · {{ r.item.name }} ×{{ r.quantity }} · {{ r.created_at|date:"M d, Y" }}</div>
+      <span class="status {{ r.status }}">{{ r.get_status_display }}</span>
+      <a class="btn secondary btn-sm" href="{% url 'staff_requests' %}?q={{ r.request_id }}">View</a>
+    </div>
+    {% empty %}<p class="empty">No requests yet.</p>{% endfor %}
+  </section>
+  <section class="panel" aria-labelledby="h-overdue">
+    <div class="panelhead"><h2 id="h-overdue">Overdue Returns</h2><a href="{% url 'staff_borrowings' %}?status=overdue">View all</a></div>
+    {% for b in overdue %}
+    <div class="suggestion">
+      {% include "partials/avatar.html" with u=b.user %}
+      <div class="grow"><b>{{ b.user.full_name }}</b>{{ b.borrowing_id }} · {{ b.item.name }} · <span class="text-alert">Due {{ b.due_at|date:"M d, Y · g:i A" }}</span></div>
+      <a class="btn secondary btn-sm" href="{% url 'staff_borrowings' %}?q={{ b.borrowing_id }}">View</a>
+    </div>
+    {% empty %}<p class="empty">No overdue items. Nice!</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/charts.js' %}"></script>{% endblock %}

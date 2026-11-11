@@ -10,8 +10,7 @@
   const fmt = {
     date(iso) {
       if (!iso) return "–";
-      const d = new Date(iso);
-      return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
+      return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
     },
     time(iso) {
       if (!iso) return "–";
@@ -66,6 +65,12 @@
   R.esc = esc;
   R.fmt = fmt;
   R.badge = (status, label) => `<span class="badge badge-${esc(status)}">${esc(label)}</span>`;
+  // Amber only inside the last 24 hours (DUE_SOON_HOURS), the same window as the due-soon reminder.
+  R.dueBadge = (iso) => {
+    const left = new Date(iso) - Date.now();
+    const status = left < 0 ? "overdue" : left < 86400000 ? "due_soon" : "active";
+    return R.badge(status, fmt.dueText(iso));
+  };
   R.debounce = (fn, ms) => {
     let t;
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
@@ -227,13 +232,17 @@
     }, ms);
 
   // ---------- Signed-in header ----------
+  // The top-bar bell shows a dot; the sidebar Notifications link shows the unread count.
   function setBadge(count) {
-    const badge = document.getElementById("bell-badge");
-    if (!badge) return;
-    badge.hidden = !count;
-    badge.textContent = count > 99 ? "99+" : String(count || "");
-    const bell = badge.closest("a");
-    if (bell) bell.setAttribute("aria-label", count ? `Notifications, ${count} unread` : "Notifications");
+    const text = count > 99 ? "99+" : String(count || "");
+    const dot = document.getElementById("bell-badge");
+    if (dot) {
+      dot.hidden = !count;
+      const bell = dot.closest("a");
+      if (bell) bell.setAttribute("aria-label", count ? `Notifications, ${count} unread` : "Notifications");
+    }
+    const nav = document.getElementById("nav-notes-badge");
+    if (nav) { nav.hidden = !count; nav.textContent = text; }
   }
 
   R.refreshBadge = async () => {
@@ -242,11 +251,46 @@
       R.user = res.user;
       setBadge(res.unread_count);
       const name = document.getElementById("user-name");
-      if (name) name.textContent = res.user.short_name;
+      if (name) name.textContent = res.user.full_name;
     }
     return res;
   };
   R.setBadge = setBadge;
+
+  // Account menu in the header: My Profile and Log out.
+  const menuBtn = document.getElementById("user-menu-btn");
+  if (menuBtn) {
+    const menu = document.getElementById("user-menu-list");
+    const toggleMenu = (open) => { menu.hidden = !open; menuBtn.setAttribute("aria-expanded", String(open)); };
+    menuBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleMenu(menu.hidden); });
+    document.addEventListener("click", () => toggleMenu(false));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !menu.hidden) { toggleMenu(false); menuBtn.focus(); }
+    });
+  }
+  // Sign Out appears in the sidebar and in the account menu.
+  document.querySelectorAll("[data-logout]").forEach((btn) => btn.addEventListener("click", async () => {
+    const yes = await R.confirm({
+      title: "Log out of REUSE?",
+      message: "You’ll need to log in again to request or return items.",
+      confirmText: "Log out",
+      cancelText: "Stay logged in",
+    });
+    if (!yes) return;
+    const res = await R.api.post("/api/auth/logout/");
+    if (res.ok) window.location.href = res.redirect || "/login/";
+    else R.toast(res.message || "We couldn't log you out. Please try again.", "error");
+  }));
+
+  // Phones show table rows as cards; each cell takes its label from the column header.
+  R.labelTables = () => {
+    document.querySelectorAll(".data-table").forEach((table) => {
+      const heads = [...table.querySelectorAll("th")].map((th) => th.textContent);
+      table.querySelectorAll("tbody tr").forEach((tr) => {
+        [...tr.children].forEach((td, i) => { td.dataset.label = heads[i] || ""; });
+      });
+    });
+  };
 
   R.userReady = (async () => {
     if (!document.body.classList.contains("app")) return null;

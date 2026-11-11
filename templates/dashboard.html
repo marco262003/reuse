@@ -1,36 +1,40 @@
 {% extends "base_app.html" %}
 {% load static %}
-{% block title %}Dashboard | REUSE{% endblock %}
+{% block title %}Dashboard{% endblock %}
 {% block page %}dashboard{% endblock %}
-{% block clock %}<time class="clock" data-clock>MM/DD/YYYY | 00:00 AM</time>{% endblock %}
-
-{% block topbar_left %}
-  <h1 class="welcome">Welcome back, <span id="welcome-name"></span>!</h1>
-  <p class="welcome-sub">Here’s what’s happening with your REUSE activity.</p>
-{% endblock %}
+{% block crumb %}Dashboard{% endblock %}
+{% block page_title %}Welcome back, <span id="welcome-name">{{ request.user.first_name|default:request.user.short_name }}</span>{% endblock %}
+{% block page_sub %}Here is an overview of your resource-sharing activity.{% endblock %}
+{% block page_actions %}<a class="btn" href="{% url 'browse' %}">Browse Resources</a>{% endblock %}
 
 {% block content %}
-<section class="stat-grid" aria-label="Summary">
-  <a class="stat" href="{% url 'browse' %}"><span class="stat-label">Available items</span><strong id="stat-available">–</strong></a>
-  <a class="stat" href="{% url 'requests' %}"><span class="stat-label">My requests</span><strong id="stat-requests">–</strong></a>
-  <a class="stat" href="{% url 'borrowed' %}"><span class="stat-label">Active borrowings</span><strong id="stat-borrowings">–</strong></a>
-  <a class="stat" href="{% url 'notifications' %}"><span class="stat-label">Alerts</span><strong id="stat-alerts">–</strong></a>
+<section class="stats" aria-label="Summary">
+  <a class="stat" href="{% url 'browse' %}"><div class="stathead">Available Resources<span class="staticon">{% include "partials/icon.html" with name="items" %}</span></div><div class="statnum" id="stat-available">–</div><div class="statfoot">Ready to request</div></a>
+  <a class="stat" href="{% url 'requests' %}"><div class="stathead">My Requests<span class="staticon">{% include "partials/icon.html" with name="requests" %}</span></div><div class="statnum" id="stat-requests">–</div><div class="statfoot">Pending and reserved requests</div></a>
+  <a class="stat" href="{% url 'borrowed' %}"><div class="stathead">Active Borrowings<span class="staticon">{% include "partials/icon.html" with name="borrow" %}</span></div><div class="statnum" id="stat-borrowings">–</div><div class="statfoot">Current transactions</div></a>
+  <a class="stat" href="{% url 'notifications' %}"><div class="stathead">Notifications<span class="staticon">{% include "partials/icon.html" with name="bell" %}</span></div><div class="statnum" id="stat-alerts">–</div><div class="statfoot">Unread updates</div></a>
+</section>
+
+<section class="panel" id="attention" aria-labelledby="h-attention" hidden>
+  <div class="panelhead"><h2 id="h-attention">Needs Attention</h2><small>Returns due soon and items ready for pickup</small></div>
+  <div id="attention-list"></div>
 </section>
 
 <section class="panel" aria-labelledby="h-requests">
-  <div class="panel-head"><h2 id="h-requests">Recent Requests</h2><a href="{% url 'requests' %}">View all</a></div>
-  <div class="table-wrap" id="recent-requests"></div>
+  <div class="panelhead"><h2 id="h-requests">Recent Requests</h2><a href="{% url 'requests' %}">View all</a></div>
+  <div class="tablewrap" id="recent-requests"></div>
 </section>
 
-<section class="panel" aria-labelledby="h-returns">
-  <div class="panel-head"><h2 id="h-returns">Upcoming Returns</h2><a href="{% url 'returns' %}">View all</a></div>
-  <div class="table-wrap" id="upcoming-returns"></div>
-</section>
-
-<section class="panel" aria-labelledby="h-items">
-  <div class="panel-head"><h2 id="h-items">Recently Added Available Items</h2><a href="{% url 'browse' %}">View all</a></div>
-  <div class="table-wrap" id="recent-items"></div>
-</section>
+<div class="grid2">
+  <section class="panel" aria-labelledby="h-returns">
+    <div class="panelhead"><h2 id="h-returns">Upcoming Returns</h2><a href="{% url 'borrowed' %}">View all</a></div>
+    <div id="upcoming-returns"></div>
+  </section>
+  <section class="panel" aria-labelledby="h-items">
+    <div class="panelhead"><h2 id="h-items">Recently Added Resources</h2><a href="{% url 'browse' %}">View all</a></div>
+    <div id="recent-items"></div>
+  </section>
+</div>
 {% endblock %}
 
 {% block scripts %}<script src="{% static 'js/dashboard.js' %}"></script>{% endblock %}

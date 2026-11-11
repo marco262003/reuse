@@ -3,8 +3,8 @@ Run every 10-15 minutes (cron / Task Scheduler):
 
     python manage.py process_due_notifications
 
-Creates "due soon" and "overdue" notifications (once each) and retries
-email/SMS deliveries that failed.
+Creates "due soon" and "overdue" notifications (once each), retries
+email/SMS deliveries that failed, and removes sign-ups that were never finished.
 """
 from datetime import timedelta
 
@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from core.models import Borrowing, BorrowingStatus, Delivery, DeliveryStatus, NotificationType
 from core.notifications import create_notification, deliver_one
+from core.registration import purge_expired_drafts
 
 
 class Command(BaseCommand):
@@ -50,3 +51,8 @@ class Command(BaseCommand):
             retried += 1
 
         self.stdout.write(self.style.SUCCESS(f"{created} reminder(s) created, {retried} delivery retry(ies)."))
+
+        # Sign-ups that were started but never finished, with the ID photos uploaded for them.
+        purged = purge_expired_drafts()
+        if purged:
+            self.stdout.write(f"{purged} unfinished sign-up(s) removed.")
