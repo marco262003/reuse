@@ -287,6 +287,8 @@ class PortraitOrientationTests(SimpleTestCase):
 
 
 class TemplateSealingTests(SimpleTestCase):
+    # This checks the key derived from SECRET_KEY, so it must not depend on a FACE_TEMPLATE_KEY set in .env.
+    @override_settings(FACE_TEMPLATE_KEY="")
     def test_sealed_templates_need_the_key(self):
         vector = faces.unit(np.arange(1, 129, dtype=np.float32))
         blob = faces.seal(vector)

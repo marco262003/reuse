@@ -50,6 +50,14 @@ cp .env.example .env
 
 Edit `.env` and set `DB_PASSWORD` to the password you used above. Keep `DB_ENGINE=postgres`. Do not share `.env` or commit it to Git.
 
+Also set `DJANGO_SECRET_KEY` to a long random value and keep `DJANGO_DEBUG=1` for local development:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+**Windows (PowerShell):** the same steps work with `python -m venv .venv`, `.\.venv\Scripts\Activate.ps1` and `copy .env.example .env` in place of the `python3`, `source` and `cp` lines above. Without `DJANGO_DEBUG=1` the app runs in production mode and refuses to start without a real `DJANGO_SECRET_KEY`.
+
 ## 4. Create tables and administrator
 
 ```bash
@@ -79,7 +87,7 @@ Run reminders manually during development with:
 python manage.py process_due_notifications
 ```
 
-For automatic reminders, schedule this command every 10–15 minutes using `cron` or a scheduler. SMS remains skipped unless a compatible SMS provider and key are configured; do not treat a skipped delivery as a sent message.
+For automatic reminders, schedule this command every 10–15 minutes using `cron` or a scheduler. SMS remains skipped unless `TEXTBEE_API_KEY` is configured (textbee.dev); do not treat a skipped delivery as a sent message.
 
 ## Troubleshooting
 

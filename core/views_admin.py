@@ -5,11 +5,11 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db.models import Case, Count, Q, When
+from django.db.models import Case, Count, Q, Sum, When
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from . import face_login, names, registration, validators as v
+from . import analytics, face_login, names, registration, validators as v
 from .models import (
     AuditLog, Borrowing, BorrowingStatus, BorrowRequest, Category, Condition,
     Delivery, Item, Notification, RequestStatus, User, UserType,
@@ -25,28 +25,51 @@ def _ctx(request, title, **extra):
     return {"admin_title": title, "admin_user": request.user, **extra}
 
 
+def _badge_counts(now):
+    """Counts the admin sidebar badges and stat cards share."""
+    return {
+        "pending_requests": BorrowRequest.objects.filter(status=RequestStatus.PENDING).count(),
+        "overdue_returns": Borrowing.objects.filter(status=BorrowingStatus.ACTIVE, due_at__lt=now).count(),
+        "unread_notifications": Notification.objects.filter(is_read=False).count(),
+    }
+
+
 @staff_member_required(login_url="login")
 def dashboard(request):
     now = timezone.now()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    monthly = list(
-        Borrowing.objects.filter(picked_up_at__gte=month_start)
-        .values("picked_up_at__date").annotate(total=Count("id")).order_by("picked_up_at__date")
+    # One query each for unit totals and request statuses instead of a loop of queries.
+    units = Item.objects.filter(is_active=True).aggregate(
+        total=Sum("total_qty"), reserved=Sum("reserved_qty"), borrowed=Sum("borrowed_qty"),
+        repair=Sum("repair_qty"), items=Count("id"),
     )
+    units = {k: v or 0 for k, v in units.items()}
+    by_status = dict(BorrowRequest.objects.values_list("status").annotate(n=Count("id")).values_list("status", "n"))
     return render(request, "admin/dashboard.html", _ctx(
         request, "Dashboard",
-        total_items=Item.objects.filter(is_active=True).count(),
-        pending_requests=BorrowRequest.objects.filter(status=RequestStatus.PENDING).count(),
+        **_badge_counts(now),
+        total_items=units["items"],
         active_borrowings=Borrowing.objects.filter(status=BorrowingStatus.ACTIVE).count(),
-        overdue_returns=Borrowing.objects.filter(status=BorrowingStatus.ACTIVE, due_at__lt=now).count(),
-        available_units=sum(i.available_qty for i in Item.objects.filter(is_active=True)),
-        borrowed_units=sum(i.borrowed_qty for i in Item.objects.filter(is_active=True)),
-        repair_units=sum(i.repair_qty for i in Item.objects.filter(is_active=True)),
-        request_summary=[{"label": label, "count": BorrowRequest.objects.filter(status=value).count()} for value, label in RequestStatus.choices],
+        available_units=max(units["total"] - units["reserved"] - units["borrowed"] - units["repair"], 0),
+        borrowed_units=units["borrowed"],
+        repair_units=units["repair"],
+        request_summary=[{"label": label, "count": by_status.get(value, 0)} for value, label in RequestStatus.choices],
         recent_requests=BorrowRequest.objects.select_related("user", "item")[:5],
         overdue=Borrowing.objects.select_related("user", "item").filter(status=BorrowingStatus.ACTIVE, due_at__lt=now).order_by("due_at")[:5],
-        monthly=monthly,
-        unread_notifications=Notification.objects.filter(is_read=False).count(),
+        trend=analytics.demand_trend(now),
+    ))
+
+
+@staff_member_required(login_url="login")
+def analytics_page(request):
+    now = timezone.now()
+    return render(request, "admin/analytics.html", _ctx(
+        request, "Analytics",
+        **_badge_counts(now),
+        trend=analytics.demand_trend(now),
+        outlook=analytics.stock_outlook(now),
+        top=analytics.top_items(now=now),
+        returns=analytics.return_histogram(now=now),
+        risk=analytics.overdue_risk(now=now),
     ))
 
 

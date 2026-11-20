@@ -13,11 +13,8 @@
 
 <div class="grid2">
   <section class="panel" aria-labelledby="h-activity">
-    <div class="panelhead"><h2 id="h-activity">Borrowing Activity</h2><small>Pickups this month</small></div>
-    <div data-linechart>
-      <ol class="chartdata">{% for m in monthly %}<li data-label="{{ m.picked_up_at__date|date:'M d' }}" data-value="{{ m.total }}">{{ m.picked_up_at__date|date:"M d" }}: {{ m.total }}</li>{% endfor %}</ol>
-      {% if not monthly %}<p class="empty">No borrowing activity this month yet.</p>{% endif %}
-    </div>
+    <div class="panelhead"><h2 id="h-activity">Borrowing Activity</h2><a href="{% url 'staff_analytics' %}">Open analytics</a></div>
+    {% include "admin/partials/trend_chart.html" %}
   </section>
   <section class="panel" aria-labelledby="h-outcomes">
     <div class="panelhead"><h2 id="h-outcomes">Request Outcomes</h2><small>Status distribution</small></div>

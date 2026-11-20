@@ -6,7 +6,8 @@
 {% block page_title %}Browse Resources{% endblock %}
 {% block page_sub %}Discover resources available in your campus.{% endblock %}
 {% block content %}
-{% include "partials/search_filter.html" %}
-<div id="items-grid" class="resourcegrid" aria-live="polite"></div>
+{% include "partials/search_filter.html" with show_sort=True %}
+<p class="resultcount" id="result-count" aria-live="polite"></p>
+<div id="items-grid" class="resourcegrid"></div>
 {% endblock %}
 {% block scripts %}<script src="{% static 'js/browse.js' %}"></script>{% endblock %}

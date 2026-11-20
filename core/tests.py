@@ -234,6 +234,40 @@ class InventoryFlowTests(TestCase):
         self.assertEqual(self.client.get(f"/api/receipts/{rid}/").status_code, 404)
         self.assertEqual(self.client.get("/api/requests/").json()["requests"], [])
 
+    def test_one_receipt_per_transaction(self):
+        rid = self.submit().json()["request"]["id"]
+        req = BorrowRequest.objects.get(request_id=rid)
+        listed = self.client.get("/api/requests/").json()["requests"][0]
+        self.assertEqual(listed["receipt_id"], rid)
+        self.assertNotIn("receipts", listed)
+
+        first = self.client.get(f"/api/receipts/{rid}/").json()["receipt"]
+        self.assertEqual((first["id"], first["approval_id"], first["borrowing_id"], first["return_id"]), (rid, None, None, None))
+
+        services.approve_request(req.pk, self.admin)
+        borrowing = services.confirm_pickup(req.pk, self.admin)
+        services.confirm_return(borrowing.pk, self.admin)
+        req.refresh_from_db()
+        borrowing.refresh_from_db()
+        ids = [rid, req.approval_id, borrowing.borrowing_id, borrowing.return_id]
+        self.assertTrue(all(ids))
+
+        # The request, approval, borrowing and return IDs all open the same single receipt.
+        receipts = [self.client.get(f"/api/receipts/{i}/").json()["receipt"] for i in ids]
+        for receipt in receipts:
+            self.assertEqual(receipt, receipts[0])
+        self.assertEqual((receipts[0]["id"], receipts[0]["status"]), (rid, "Returned"))
+        self.assertEqual(receipts[0]["return_id"], borrowing.return_id)
+        self.assertIsNotNone(receipts[0]["returned_at"])
+        self.assertNotIn("type", receipts[0])
+        detail = self.client.get(f"/api/borrowings/{borrowing.borrowing_id}/").json()["borrowing"]
+        self.assertEqual(detail["receipt_id"], rid)
+
+        # Nobody else can open any of them, and unknown IDs are 404.
+        self.client.force_login(self.other)
+        for i in ids + ["X00001", "R99999"]:
+            self.assertEqual(self.client.get(f"/api/receipts/{i}/").status_code, 404, i)
+
     def test_anonymous_requests_are_rejected(self):
         self.client.logout()
         self.assertEqual(self.client.get("/api/items/").status_code, 401)

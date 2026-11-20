@@ -71,6 +71,22 @@
     const status = left < 0 ? "overdue" : left < 86400000 ? "due_soon" : "active";
     return R.badge(status, fmt.dueText(iso));
   };
+  // When an unavailable item is expected back: { text, none } where none = no date known.
+  R.backText = (item) => {
+    if (item.is_available) return null;
+    const at = item.next_available_at;
+    if (!at) {
+      return { none: true, text: item.unavailable_reason === "Under Repair" ? "Under repair · no return date yet" : "No return date yet" };
+    }
+    const when = new Date(at);
+    if (when < new Date()) return { none: false, text: "A return is late · could be back any time" };
+    const today = new Date();
+    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    if (when.toDateString() === today.toDateString()) return { none: false, text: `Expected back today, ${fmt.time(at)}` };
+    if (when.toDateString() === tomorrow.toDateString()) return { none: false, text: `Expected back tomorrow, ${fmt.time(at)}` };
+    const day = when.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return { none: false, text: `Expected back around ${day}` };
+  };
   R.debounce = (fn, ms) => {
     let t;
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };

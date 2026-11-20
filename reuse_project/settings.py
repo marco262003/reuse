@@ -43,7 +43,13 @@ SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "dev-only-secret-change-me",
 )
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+# Off unless DJANGO_DEBUG=1 is set (the local .env sets it), so a missing .env is never an insecure server.
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
+
+if not DEBUG and SECRET_KEY == "dev-only-secret-change-me":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY in .env (or the environment) when DJANGO_DEBUG is not 1.")
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -72,6 +78,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "anymail",
     "core",
 ]
 
@@ -200,7 +207,14 @@ DEFAULT_FROM_EMAIL = os.environ.get(
     "REUSE <no-reply@reuse.local>",
 )
 
-if os.environ.get("EMAIL_HOST"):
+if os.environ.get("MAILJET_API_KEY"):
+    # Mailjet over HTTPS (port 443): works on networks that block the email ports.
+    EMAIL_BACKEND = "anymail.backends.mailjet.EmailBackend"
+    ANYMAIL = {
+        "MAILJET_API_KEY": os.environ["MAILJET_API_KEY"],
+        "MAILJET_SECRET_KEY": os.environ.get("MAILJET_SECRET_KEY", ""),
+    }
+elif os.environ.get("EMAIL_HOST"):
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = os.environ["EMAIL_HOST"]
     EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
@@ -213,9 +227,11 @@ else:
 
 
 # --- SMS ----------------------------------------------------------------------
-# SMS requires a configured provider and API integration.
-SMS_API_KEY = os.environ.get("SMS_API_KEY", "")
-SMS_SENDER_NAME = os.environ.get("SMS_SENDER_NAME", "")
+# SMS goes through textbee.dev (an Android phone with a SIM sends the messages).
+# Without TEXTBEE_API_KEY, SMS deliveries are recorded as skipped, never as sent.
+TEXTBEE_API_KEY = os.environ.get("TEXTBEE_API_KEY", "")
+TEXTBEE_DEVICE_ID = os.environ.get("TEXTBEE_DEVICE_ID", "")  # optional; default device if empty
+TEXTBEE_BASE_URL = os.environ.get("TEXTBEE_BASE_URL", "https://api.textbee.dev/api/v1")
 
 
 # --- ID-first registration and face login ------------------------------------------

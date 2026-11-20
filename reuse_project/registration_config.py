@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
-_DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+_DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 
 
 # --- Uploaded ID files ----------------------------------------------------------

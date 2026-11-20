@@ -18,7 +18,7 @@ def item_brief(item):
     }
 
 
-def item_dict(item, subscribed=False, pending_request_id=None):
+def item_dict(item, subscribed=False, pending_request_id=None, next_available_at=None):
     data = item_brief(item)
     data.update(
         description=item.description,
@@ -31,21 +31,12 @@ def item_dict(item, subscribed=False, pending_request_id=None):
         date_added=iso(item.date_added),
         is_available=item.available_qty > 0,
         unavailable_reason=item.unavailable_reason,
+        # Soonest a unit is expected back (unavailable items only). A past time means a late return.
+        next_available_at=iso(next_available_at),
         subscribed=subscribed,
         pending_request_id=pending_request_id,
     )
     return data
-
-
-def receipts_for(req):
-    """The receipt IDs that exist so far for one transaction."""
-    receipts = [{"type": "Request", "id": req.request_id}]
-    if req.approval_id:
-        receipts.append({"type": "Approval", "id": req.approval_id})
-    borrowing = getattr(req, "borrowing", None) if req.status == RequestStatus.FULFILLED else None
-    if borrowing:
-        receipts.append({"type": "Borrowing", "id": borrowing.borrowing_id})
-    return receipts
 
 
 def request_dict(req):
@@ -69,7 +60,7 @@ def request_dict(req):
         "created_at": iso(req.created_at),
         "can_edit": req.status == RequestStatus.PENDING,
         "can_cancel": req.status in (RequestStatus.PENDING, RequestStatus.APPROVED),
-        "receipts": receipts_for(req),
+        "receipt_id": req.request_id,  # the transaction's one receipt
     }
 
 
@@ -85,10 +76,6 @@ def borrowing_status(borrowing):
 def borrowing_dict(borrowing):
     status, label = borrowing_status(borrowing)
     req = borrowing.request
-    receipts = [{"type": "Request", "id": req.request_id}]
-    if req.approval_id:
-        receipts.append({"type": "Approval", "id": req.approval_id})
-    receipts.append({"type": "Borrowing", "id": borrowing.borrowing_id})
     return {
         "kind": "borrowing",
         "id": borrowing.borrowing_id,
@@ -105,7 +92,7 @@ def borrowing_dict(borrowing):
         "purpose": req.purpose,
         "pickup_area": borrowing.item.pickup_return_area,
         "return_area": borrowing.item.pickup_return_area,
-        "receipts": receipts,
+        "receipt_id": req.request_id,
     }
 
 
@@ -127,7 +114,7 @@ def canceled_reservation_dict(req):
         "purpose": req.purpose,
         "pickup_area": req.item.pickup_return_area,
         "return_area": req.item.pickup_return_area,
-        "receipts": receipts_for(req),
+        "receipt_id": req.request_id,
     }
 
 

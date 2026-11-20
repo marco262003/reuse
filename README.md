@@ -7,10 +7,11 @@ the Django admin site, so there is only one inventory and one set of transaction
 ## Run it
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv               # Windows: python -m venv .venv
+source .venv/bin/activate           # Windows (PowerShell): .\.venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt # on a production server: requirements.txt
-cp .env.example .env               # set PostgreSQL password in .env
+cp .env.example .env               # Windows: copy .env.example .env
+                                   # then set DB_PASSWORD and DJANGO_SECRET_KEY in .env
 
 python manage.py check
 python manage.py migrate            # creates application tables
@@ -45,7 +46,7 @@ core/
   models.py           User, Item, BorrowRequest, Borrowing, Notification, Delivery, AuditLog, ...
   services.py         ALL inventory + transaction rules (create/edit/cancel/approve/pickup/return)
   notifications.py    web + email + SMS delivery, tracked per channel (no duplicates)
-  sms.py              SMS adapter (Semaphore example)
+  sms.py              SMS adapter (textbee.dev)
   registration.py     ID-first sign-up rules (drafts, reading the ID, duplicates, creating the account)
   face_login.py       pending sign-in, face scan, email-code fallback
   names.py            name parsing and name rules (pure Python)
@@ -149,8 +150,8 @@ The tests replace storage, OCR and the face engine with stand-ins, so they run w
 - **Database:** use PostgreSQL (`DB_ENGINE=postgres`, plus `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`).
   The code locks inventory rows while reserving, but SQLite ignores row locks.
 - **Environment variables:** `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=0`, `DJANGO_ALLOWED_HOSTS`, `SITE_URL` (used in verification links),
-  `EMAIL_HOST` / `EMAIL_HOST_USER` / `EMAIL_HOST_PASSWORD` for real email, `SMS_API_KEY` for SMS.
-  Without `SMS_API_KEY`, SMS deliveries are recorded as *skipped* – never as sent.
+  `EMAIL_HOST` / `EMAIL_HOST_USER` / `EMAIL_HOST_PASSWORD` for real email, `TEXTBEE_API_KEY` for SMS.
+  Without `TEXTBEE_API_KEY`, SMS deliveries are recorded as *skipped* – never as sent.
 - **HTTPS:** with `DJANGO_DEBUG=0` the session and CSRF cookies become HTTPS-only.
 - **Cache:** login throttling and the ID-reading limits use Django's cache. With several server processes, switch `CACHES` to Redis/Memcached.
 - **Static files:** run `python manage.py collectstatic` and serve them with WhiteNoise or your web server.

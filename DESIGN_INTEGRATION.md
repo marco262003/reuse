@@ -38,5 +38,7 @@ Only the frontend changed: no models, migrations, views, URLs, API endpoints or 
 | User management, add user, user detail | User Management (detail page adapted with panels) |
 | Admin notifications | Not in the design; adapted as a table page |
 
-Design screens with no backend yet (Analytics & Reports, Reports, System Settings) were not added.
+Analytics now exists at `/admin-dashboard/analytics/` (`core/analytics.py`, `templates/admin/analytics.html`):
+weekly pickups with a 4-week forecast, stock outlook, overdue risk, most borrowed items and return times.
+Design screens with no backend yet (Reports, System Settings) were not added.
 The Django built-in admin (`/admin/`) keeps Django's own look.

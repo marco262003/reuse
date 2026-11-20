@@ -17,16 +17,17 @@
 
   const photo = (item) => `<img src="${esc(item.image_url || R.placeholder)}" alt="${esc(item.name)}">`;
   const row = (label, value) => `<dt>${esc(label)}</dt><dd>${value == null || value === "" ? "–" : value}</dd>`;
-  const receiptChips = (receipts) =>
-    `<div class="chips">${receipts.map((r) => `<button type="button" class="chip" data-receipt="${esc(r.id)}">${esc(r.type)} receipt ${esc(r.id)}</button>`).join("")}</div>`;
+  // Every transaction has one receipt, numbered by its request ID.
+  const receiptLink = (id) => `<button type="button" class="link-btn" data-receipt="${esc(id)}">View receipt ${esc(id)}</button>`;
 
   function availability(item) {
-    return item.is_available
-      ? '<p class="avail avail-yes">AVAILABLE</p>'
-      : `<p class="avail avail-no">UNAVAILABLE<span class="avail-reason">${esc(item.unavailable_reason)}</span></p>`;
+    if (item.is_available) return '<p class="avail avail-yes">AVAILABLE</p>';
+    const back = R.backText(item);
+    return `<p class="avail avail-no">UNAVAILABLE<span class="avail-reason">${esc(item.unavailable_reason)}</span>` +
+      `${back && !back.none ? `<span class="avail-back">${esc(back.text)}</span>` : ""}</p>`;
   }
 
-  // Click handling shared by every modal: receipt chips open the receipt.
+  // Click handling shared by every modal: the receipt button opens the receipt.
   function wireReceipts(modal) {
     modal.body.addEventListener("click", (e) => {
       const chip = e.target.closest("[data-receipt]");
@@ -81,9 +82,11 @@
           return R.toast(result.message || "We couldn't turn on notifications.", "error");
         }
         modal.close();
+        const back = R.backText(item);
         R.modal.open(
           `<h2 class="modal-title">Notification Enabled <span class="check" aria-hidden="true">✓</span></h2>
-           <p class="modal-text">You’ll be notified through your registered email, mobile number and REUSE web notifications when this item becomes available.</p>`,
+           <p class="modal-text">You’ll be notified through your registered email, mobile number and REUSE web notifications when this item becomes available.</p>
+           ${back && !back.none ? `<p class="modal-text"><strong>${esc(back.text)}.</strong></p>` : ""}`,
           { className: "modal-sm", label: "Notification enabled" }
         );
         R.changed();
@@ -222,7 +225,7 @@
        <p class="modal-text">Your request has been ${mode} successfully.</p>
        <p class="modal-text">Request ID: <strong>${esc(req.id)}</strong></p>
        <p class="modal-text">Status: ${R.badge(req.status, req.status_label)}</p>
-       <p><button type="button" class="link-btn" data-receipt="${esc(req.id)}">View request receipt</button></p>
+       <p><button type="button" class="link-btn" data-receipt="${esc(req.id)}">View receipt</button></p>
        <div class="modal-actions">
          <button type="button" class="btn btn-outline" data-act="cancel">Cancel Request</button>
          <button type="button" class="btn btn-primary" data-act="edit">Edit Request</button>
@@ -279,7 +282,7 @@
            ${row("Return:", fmt.long(req.return_at))}
            ${row("Reason for borrowing:", esc(req.purpose))}
            ${row("Status:", esc(req.status_label))}
-           ${row("Receipts:", receiptChips(req.receipts))}
+           ${row("Receipt:", receiptLink(req.receipt_id))}
          </dl>
        </div>
        ${rejected}${approvedNote}
@@ -320,7 +323,7 @@
            ${row("Pickup Location:", esc(b.pickup_area))}
            ${row("Return Location:", esc(b.return_area))}
            ${row("Status:", R.badge(b.status, b.status_label))}
-           ${row("Receipts:", receiptChips(b.receipts))}
+           ${row("Receipt:", receiptLink(b.receipt_id))}
          </dl>
        </div>`,
       { className: "modal-wide", label: `Borrowing ${b.id}` }
@@ -340,11 +343,12 @@
     const r = res.receipt;
     const modal = R.modal.open(
       `<article>
-         <h2 class="modal-title">${esc(r.type)} Receipt ${esc(r.id)}</h2>
+         <h2 class="modal-title">Receipt ${esc(r.id)}</h2>
          <dl class="kv">
            ${row("Request ID:", esc(r.request_id))}
            ${r.approval_id ? row("Approval ID:", esc(r.approval_id)) : ""}
            ${r.borrowing_id ? row("Borrowing ID:", esc(r.borrowing_id)) : ""}
+           ${r.return_id ? row("Return ID:", esc(r.return_id)) : ""}
            ${row("Item:", esc(r.item))}
            ${row("Quantity:", r.quantity)}
            ${row("Requester:", `${esc(r.requester.name)} (${esc(r.requester.user_type)})<br>${esc(r.requester.email)}`)}
@@ -353,6 +357,7 @@
            ${row("Borrow date:", fmt.long(r.borrow_at))}
            ${row("Return date:", fmt.long(r.return_at))}
            ${r.picked_up_at ? row("Picked up on:", fmt.long(r.picked_up_at)) : ""}
+           ${r.returned_at ? row("Returned on:", fmt.long(r.returned_at)) : ""}
            ${row("Status:", esc(r.status))}
            ${row("Reason for borrowing:", esc(r.purpose))}
          </dl>

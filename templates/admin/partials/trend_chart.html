@@ -1,0 +1,15 @@
+{# Weekly pickups with a dashed forecast and its likely range. Drawn by charts.js from this list. #}
+<div data-linechart>
+  <ol class="chartdata">
+    {% for p in trend.points %}<li data-label="{{ p.label }}" data-value="{{ p.value }}">Week of {{ p.label }}: {{ p.value }} pickup{{ p.value|pluralize }}</li>{% endfor %}
+    {% for f in trend.forecast %}<li data-label="{{ f.label }}" data-value="{{ f.value|stringformat:'.1f' }}" data-low="{{ f.low|stringformat:'.1f' }}" data-high="{{ f.high|stringformat:'.1f' }}" data-forecast>Forecast for week of {{ f.label }}: about {{ f.value|floatformat:0 }} (likely {{ f.low|floatformat:0 }}–{{ f.high|floatformat:0 }})</li>{% endfor %}
+  </ol>
+  {% if not trend.has_chart %}<p class="empty">{% if trend.this_week %}{{ trend.this_week }} pickup{{ trend.this_week|pluralize }} this week. The chart starts once a full week is recorded.{% else %}No pickups recorded yet.{% endif %}</p>{% endif %}
+</div>
+{% if trend.has_chart %}
+<div class="chartkey" aria-hidden="true">
+  <span><i class="key-line"></i>Actual pickups</span>
+  {% if trend.forecast %}<span><i class="key-line dashed"></i>Forecast</span><span><i class="key-band"></i>Likely range</span>{% endif %}
+</div>
+{% endif %}
+{% if trend.summary %}<p class="insight">{% if trend.has_forecast %}<b>Forecast.</b> {% endif %}{{ trend.summary }}</p>{% endif %}

@@ -1,7 +1,7 @@
 Django>=5.1,<6.0
 psycopg[binary]>=3.2,<4.0
 Pillow>=10.0,<13.0
-python-dotenv>=1.0
+django-anymail>=13.0              # sends email through Mailjet's HTTPS API when MAILJET_API_KEY is set
 
 # ID-first registration and face login
 boto3>=1.35,<2.0                  # object storage for uploaded ID images (any S3-compatible service)

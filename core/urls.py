@@ -22,6 +22,7 @@ urlpatterns = [
 
     # --- Custom Admin Dashboard --------------------------------------------
     path("admin-dashboard/", staff_pages.dashboard, name="staff_dashboard"),
+    path("admin-dashboard/analytics/", staff_pages.analytics_page, name="staff_analytics"),
     path("admin-dashboard/items/", staff_pages.items, name="staff_items"),
     path("admin-dashboard/items/save/", staff_pages.item_save, name="staff_item_save"),
     path(

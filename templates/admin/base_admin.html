@@ -20,6 +20,7 @@
         <div class="navgroup">
           <div class="navlabel">OVERVIEW</div>
           <a class="navitem {% if url_name == 'staff_dashboard' %}active{% endif %}" href="{% url 'staff_dashboard' %}" title="Dashboard"><span class="navicon">{% include "partials/icon.html" with name="dashboard" %}</span><span class="txt">Dashboard</span></a>
+          <a class="navitem {% if url_name == 'staff_analytics' %}active{% endif %}" href="{% url 'staff_analytics' %}" title="Analytics"><span class="navicon">{% include "partials/icon.html" with name="analytics" %}</span><span class="txt">Analytics</span></a>
           <a class="navitem {% if url_name == 'staff_notifications' %}active{% endif %}" href="{% url 'staff_notifications' %}" title="Notifications"><span class="navicon">{% include "partials/icon.html" with name="bell" %}</span><span class="txt">Notifications</span>{% if unread_notifications %}<span class="navbadge">{{ unread_notifications }}</span>{% endif %}</a>
         </div>
         <div class="navgroup">

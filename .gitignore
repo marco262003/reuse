@@ -8,3 +8,6 @@ media/profiles/
 db.sqlite3
 staticfiles/
 core/test1.py
+
+# Database dumps contain personal data; keep them out of git
+*.sql

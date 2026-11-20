@@ -2,10 +2,11 @@
 SMS sending. Email/SMS only count as delivered when a real provider accepts the
 message - the UI alone never counts.
 
-This adapter is written for the Semaphore HTTP API (popular in the Philippines).
-Check the provider's current docs and swap this function if you use another one.
+This adapter uses the textbee.dev HTTP API: textbee queues the message and your
+registered Android phone sends it through its SIM. A 200 reply means textbee
+accepted the message, not that it was delivered, and the phone must stay online.
 """
-import urllib.parse
+import json
 import urllib.request
 
 from django.conf import settings
@@ -16,16 +17,25 @@ class SMSNotConfigured(Exception):
 
 
 def send_sms(number, message):
-    if not settings.SMS_API_KEY:
+    if not settings.TEXTBEE_API_KEY:
         raise SMSNotConfigured("SMS provider is not configured.")
     payload = {
-        "apikey": settings.SMS_API_KEY,
-        "number": number.lstrip("+"),   # +639171234567 -> 639171234567
+        "recipients": [number],   # +639171234567 (international format is accepted as-is)
         "message": message,
     }
-    if settings.SMS_SENDER_NAME:
-        payload["sendername"] = settings.SMS_SENDER_NAME
-    data = urllib.parse.urlencode(payload).encode()
-    req = urllib.request.Request("https://api.semaphore.co/api/v4/messages", data=data, method="POST")
-    with urllib.request.urlopen(req, timeout=10) as response:  # raises on HTTP errors
-        response.read()
+    if settings.TEXTBEE_DEVICE_ID:
+        payload["deviceId"] = settings.TEXTBEE_DEVICE_ID
+    req = urllib.request.Request(
+        f"{settings.TEXTBEE_BASE_URL.rstrip('/')}/gateway/send-sms",
+        data=json.dumps(payload).encode(),
+        method="POST",
+        headers={
+            "x-api-key": settings.TEXTBEE_API_KEY,
+            "Content-Type": "application/json",
+            "User-Agent": "reuse-system/1.0",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=10) as response:  # raises on HTTP errors (400/401/429...)
+        body = json.loads(response.read() or b"{}")
+    if body.get("success") is False:
+        raise RuntimeError(f"textbee rejected the message: {body.get('error') or body.get('message') or body}")

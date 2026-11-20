@@ -9,4 +9,13 @@
     <option value="">All categories</option>
     {% for value, label in categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
   </select>
+  {% if show_sort %}
+  <select id="sort" aria-label="Sort items">
+    <option value="available">Available first</option>
+    <option value="name">Name (A–Z)</option>
+    <option value="newest">Newest</option>
+    <option value="popular">Most borrowed</option>
+  </select>
+  <label class="toggle"><input type="checkbox" id="available-only"> Available only</label>
+  {% endif %}
 </form>

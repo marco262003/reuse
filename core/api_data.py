@@ -5,6 +5,9 @@ show another person's data (it simply answers 404).
 """
 import re
 
+from django.db.models import Case, Value, When
+
+from .analytics import next_available_map, user_record
 from .api import api_view, fail, ok
 from .models import (
     Borrowing, BorrowingStatus, BorrowRequest, Category, Item, ItemSubscription,
@@ -40,18 +43,31 @@ def _subscription_and_pending_maps(user, item_ids):
     return subscribed, pending
 
 
+SORTS = {
+    # Available items first, then by name: what most people want when browsing.
+    "available": (Case(When(avail__gt=0, then=Value(0)), default=Value(1)), "name"),
+    "name": ("name",),
+    "newest": ("-date_added", "name"),
+    "popular": ("-times_borrowed", "name"),
+}
+
+
 @api_view(["GET"])
 def items_list(request):
     q = request.GET.get("q", "").strip()
     category = request.GET.get("category", "").strip()
-    items = Item.objects.filter(is_active=True)
+    sort = request.GET.get("sort", "available")
+    items = Item.objects.filter(is_active=True).with_available()
     if q:
         items = items.filter(name__icontains=q)          # partial match
     if category in Category.values:
         items = items.filter(category=category)          # works together with the search
-    items = list(items.order_by("name"))
+    if request.GET.get("available") == "1":
+        items = items.filter(avail__gt=0)
+    items = list(items.order_by(*SORTS.get(sort, SORTS["available"])))
     subscribed, pending = _subscription_and_pending_maps(request.user, [i.pk for i in items])
-    return ok({"items": [item_dict(i, i.pk in subscribed, pending.get(i.pk)) for i in items]})
+    back = next_available_map(items)
+    return ok({"items": [item_dict(i, i.pk in subscribed, pending.get(i.pk), back.get(i.pk)) for i in items]})
 
 
 @api_view(["GET"])
@@ -60,7 +76,8 @@ def item_detail(request, item_id):
     if not item:
         return fail("Item not found.", 404)
     subscribed, pending = _subscription_and_pending_maps(request.user, [item.pk])
-    return ok({"item": item_dict(item, item.pk in subscribed, pending.get(item.pk))})
+    back = next_available_map([item])
+    return ok({"item": item_dict(item, item.pk in subscribed, pending.get(item.pk), back.get(item.pk))})
 
 
 @api_view(["POST"])
@@ -165,35 +182,35 @@ def returns_list(request):
 # ---------------------------------------------------------------------------
 # Receipts
 # ---------------------------------------------------------------------------
+# Each stage of a transaction has its own ID; every one of them opens the same receipt.
+RECEIPT_LOOKUPS = (
+    (r"R\d{5}", "request_id"),
+    (r"A\d{5}", "approval_id"),
+    (r"B\d{5}", "borrowing__borrowing_id"),
+    (r"RT\d{5}", "borrowing__return_id"),
+)
+
+
 @api_view(["GET"])
 def receipt_detail(request, ref_id):
-    user = request.user
-    borrowing = None
-    if re.fullmatch(r"R\d{5}", ref_id):
-        req = BorrowRequest.objects.select_related("item", "user").filter(request_id=ref_id, user=user).first()
-        kind = "Request"
-    elif re.fullmatch(r"A\d{5}", ref_id):
-        req = BorrowRequest.objects.select_related("item", "user").filter(approval_id=ref_id, user=user).first()
-        kind = "Approval"
-    elif re.fullmatch(r"B\d{5}", ref_id):
-        borrowing = Borrowing.objects.select_related("item", "request", "user").filter(borrowing_id=ref_id, user=user).first()
-        req = borrowing.request if borrowing else None
-        kind = "Borrowing"
-    else:
-        req, kind = None, ""
+    """The one receipt for a transaction, numbered by its request ID."""
+    field = next((name for pattern, name in RECEIPT_LOOKUPS if re.fullmatch(pattern, ref_id)), None)
+    req = (
+        BorrowRequest.objects.select_related("item", "user", "borrowing")
+        .filter(user=request.user, **{field: ref_id}).first()
+        if field else None
+    )
     if not req:
         return fail("Receipt not found.", 404)
 
-    if kind == "Borrowing":
-        status = borrowing_status(borrowing)[1]
-    else:
-        status = req.get_status_display()
+    borrowing = getattr(req, "borrowing", None)
+    status = borrowing_status(borrowing)[1] if borrowing else req.get_status_display()
     return ok({"receipt": {
-        "type": kind,
-        "id": ref_id,
+        "id": req.request_id,
         "request_id": req.request_id,
         "approval_id": req.approval_id,
         "borrowing_id": borrowing.borrowing_id if borrowing else None,
+        "return_id": borrowing.return_id if borrowing else None,
         "requester": {
             "name": req.user.full_name, "email": req.user.email,
             "user_type": req.user.get_user_type_display(),
@@ -205,6 +222,7 @@ def receipt_detail(request, ref_id):
         "borrow_at": iso(req.borrow_at),
         "return_at": iso(req.return_at),
         "picked_up_at": iso(borrowing.picked_up_at) if borrowing else None,
+        "returned_at": iso(borrowing.returned_at) if borrowing else None,
         "status": status,
         "purpose": req.purpose,
     }})
@@ -256,6 +274,8 @@ def dashboard(request):
             "items_to_return": active.count(),
             "alerts": Notification.objects.filter(user=user, is_read=False).count(),
         },
+        "record": user_record(user),
+        "has_any_request": BorrowRequest.objects.filter(user=user).exists(),
         "recent_requests": [request_dict(r) for r in recent_requests],
         "ready_for_pickup": [request_dict(r) for r in ready_for_pickup],
         "upcoming_returns": [borrowing_dict(b) for b in active.order_by("due_at")[:5]],

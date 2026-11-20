@@ -63,10 +63,6 @@ def read_verify_token(token):
 
 def send_verification_email(user):
     link = f"{settings.SITE_URL}/verify-email/{make_verify_token(user)}/"
-
-    print("DEBUG SITE_URL:", settings.SITE_URL)
-    print("DEBUG VERIFICATION LINK:", link)
-
     body = (
         f"Hi {user.full_name},\n\n"
         "Welcome to REUSE. Please verify your school email by opening this link:\n"

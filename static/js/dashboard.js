@@ -57,18 +57,52 @@
       "", `data-item="${i.id}"`)).join("");
   }
 
+  // Grey placeholder rows in the shape of the content, instead of a spinner.
+  const skeleton = (rows = 3) => `<div role="status" aria-label="Loading">${
+    '<div class="skelrow"><span class="skeleton"></span><span class="grow"><span class="skeleton"></span><span class="skeleton"></span></span></div>'.repeat(rows)
+  }</div>`;
+
+  function setStat(id, value) {
+    const el = $(id);
+    el.textContent = value;
+    el.classList.remove("skeleton", "is-loading");
+    el.removeAttribute("aria-busy");
+  }
+
+  // First-visit guide: shown until the user makes a request or hides it.
+  const GUIDE = "reuse.guideHidden";
+  const guideHidden = () => { try { return localStorage.getItem(GUIDE) === "1"; } catch (e) { return false; } };
+  $("guide-dismiss").addEventListener("click", () => {
+    try { localStorage.setItem(GUIDE, "1"); } catch (e) { /* ignore */ }
+    $("guide").hidden = true;
+  });
+
+  function renderRecord(record) {
+    $("record").hidden = !record.returned;
+    if (!record.returned) return;
+    const rate = record.on_time_rate;
+    $("record-rate").textContent = `${rate}%`;
+    $("record-fill").style.width = `${rate}%`;
+    $("record-fill").className = `meter-fill ${rate >= 80 ? "" : rate >= 50 ? "mid" : "low"}`;
+    $("record-meter").setAttribute("aria-label", `${rate}% returned on time`);
+    const note = rate === 100 ? "Great job, keep it up!" : rate >= 80 ? "Nice work." : "Returning on time keeps items available for everyone.";
+    $("record-text").textContent = `${record.on_time} of ${record.returned} item${record.returned === 1 ? "" : "s"} returned on time. ${note}`;
+  }
+
   async function load(silent) {
-    if (!silent) ["recent-requests", "upcoming-returns", "recent-items"].forEach((id) => R.state.loading($(id)));
+    if (!silent) ["recent-requests", "upcoming-returns", "recent-items"].forEach((id) => { $(id).innerHTML = skeleton(); });
     const res = await R.api.get("/api/dashboard/");
     if (!res.ok) {
       ["recent-requests", "upcoming-returns", "recent-items"].forEach((id) =>
         R.state.error($(id), res.message || "We couldn't load your dashboard.", () => load(false)));
       return;
     }
-    $("stat-available").textContent = res.counts.available_items;
-    $("stat-requests").textContent = res.counts.my_requests;
-    $("stat-borrowings").textContent = res.counts.active_borrowings;
-    $("stat-alerts").textContent = res.counts.alerts;
+    setStat("stat-available", res.counts.available_items);
+    setStat("stat-requests", res.counts.my_requests);
+    setStat("stat-borrowings", res.counts.active_borrowings);
+    setStat("stat-alerts", res.counts.alerts);
+    $("guide").hidden = res.has_any_request || guideHidden();
+    renderRecord(res.record);
     renderAttention(res.upcoming_returns, res.ready_for_pickup);
     renderRequests(res.recent_requests);
     renderReturns(res.upcoming_returns);
