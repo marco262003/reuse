@@ -1,0 +1,82 @@
+{% extends "admin/base_admin.html" %}
+{% load static %}
+{% block page_title %}Analytics{% endblock %}
+{% block page_sub %}Borrowing trends, demand forecast, return behaviour and items that may run short.{% endblock %}
+{% block content %}
+
+<section class="panel" aria-labelledby="h-trend">
+  <div class="panelhead"><h2 id="h-trend">Weekly Pickups and Forecast</h2><small>Last {{ trend.weeks }} week{{ trend.weeks|pluralize }} · next 4 weeks forecast</small></div>
+  {% include "admin/partials/trend_chart.html" %}
+</section>
+
+<div class="grid2">
+  <section class="panel" aria-labelledby="h-outlook">
+    <div class="panelhead"><h2 id="h-outlook">Stock Outlook</h2><small>Items that may run short</small></div>
+    <p class="panelnote">Projected units out at once = forecast units borrowed per week × average loan length. Items over 80% of their lendable units are listed.</p>
+    {% for o in outlook %}
+    <div class="suggestion">
+      <span class="suggestionmark">{% include "partials/icon.html" with name="alert" %}</span>
+      <div class="grow">
+        <b>{{ o.item.name }}</b>
+        About {{ o.per_week }} unit{{ o.per_week|pluralize }}/week · kept {{ o.loan_days }} day{{ o.loan_days|pluralize }} on average · {{ o.projected }} projected out of {{ o.usable }} lendable
+        <div class="meter" role="img" aria-label="{{ o.load_pct }}% of lendable units"><span class="meter-fill {{ o.level }}" style="width: {% if o.load_pct > 100 %}100{% else %}{{ o.load_pct }}{% endif %}%"></span></div>
+      </div>
+      {% if o.level == "short" %}<span class="status declined">Short by {{ o.shortfall }}</span>{% else %}<span class="status pending">Tight · {{ o.load_pct }}%</span>{% endif %}
+    </div>
+    {% empty %}
+    <p class="empty">{% if trend.has_forecast %}No items are projected to run short.{% else %}Not enough history yet to project stock.{% endif %}</p>
+    {% endfor %}
+  </section>
+
+  <section class="panel" aria-labelledby="h-risk">
+    <div class="panelhead"><h2 id="h-risk">Overdue Risk</h2><small>Not late yet, but likely to be</small></div>
+    <p class="panelnote">Based on each borrower's past return record. New borrowers start at a low score, so one late return does not flag them on its own.</p>
+    {% for r in risk %}
+    {% with b=r.borrowing %}
+    <div class="suggestion">
+      {% include "partials/avatar.html" with u=b.user %}
+      <div class="grow"><b>{{ b.user.full_name }}</b>{{ b.borrowing_id }} · {{ b.item.name }} ×{{ b.quantity }} · Due {{ b.due_at|date:"M d, g:i A" }}<br>{{ r.reason }}</div>
+      <span class="status {% if r.level == 'high' %}declined{% else %}pending{% endif %}">{{ r.level|capfirst }} risk</span>
+      <a class="btn secondary btn-sm" href="{% url 'staff_borrowings' %}?q={{ b.borrowing_id }}">View</a>
+    </div>
+    {% endwith %}
+    {% empty %}
+    <p class="empty">No active borrowings look likely to be returned late.</p>
+    {% endfor %}
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="panel" aria-labelledby="h-top">
+    <div class="panelhead"><h2 id="h-top">Most Borrowed Items</h2><small>Last 90 days</small></div>
+    {% if top %}
+    <ol class="hbars">
+      {% for t in top %}
+      <li>
+        <span class="hbar-label" title="{{ t.name }}">{{ t.name }}</span>
+        <span class="hbar-track"><span class="hbar-fill" style="width: {{ t.pct }}%"></span></span>
+        <span class="hbar-value">{{ t.times }}<small> · {{ t.units }} unit{{ t.units|pluralize }}</small></span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}<p class="empty">No pickups in the last 90 days.</p>{% endif %}
+  </section>
+
+  <section class="panel" aria-labelledby="h-returns">
+    <div class="panelhead"><h2 id="h-returns">Return Times</h2><small>Returns in the last 180 days</small></div>
+    {% if returns.total %}
+    <div class="histogram" role="img" aria-label="Return times: {% for b in returns.buckets %}{{ b.label }} {{ b.count }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+      {% for b in returns.buckets %}
+      <div class="hist-col">
+        <span class="hist-count">{{ b.count }}</span>
+        <span class="hist-bar {{ b.key }}" style="height: {% if b.count %}{{ b.pct }}{% else %}0{% endif %}%" title="{{ b.label }}: {{ b.count }} ({{ b.share }}%)"></span>
+        <span class="hist-label">{{ b.label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="insight"><b>{{ returns.on_time_rate }}% returned on time</b> out of {{ returns.total }} return{{ returns.total|pluralize }}.{% if returns.still_overdue %} {{ returns.still_overdue }} borrowing{{ returns.still_overdue|pluralize }} {{ returns.still_overdue|pluralize:"is,are" }} overdue and not back yet (<a href="{% url 'staff_borrowings' %}?status=overdue">view</a>).{% endif %}</p>
+    {% else %}<p class="empty">No returns recorded in the last 180 days.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/charts.js' %}"></script>{% endblock %}

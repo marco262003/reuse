@@ -3,10 +3,13 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Count
+from django.conf import settings
+from django.core.mail import send_mail
+from django.db.models import Case, Count, Q, Sum, When
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from . import analytics, face_login, names, registration, validators as v
 from .models import (
     AuditLog, Borrowing, BorrowingStatus, BorrowRequest, Category, Condition,
     Delivery, Item, Notification, RequestStatus, User, UserType,
@@ -22,28 +25,51 @@ def _ctx(request, title, **extra):
     return {"admin_title": title, "admin_user": request.user, **extra}
 
 
+def _badge_counts(now):
+    """Counts the admin sidebar badges and stat cards share."""
+    return {
+        "pending_requests": BorrowRequest.objects.filter(status=RequestStatus.PENDING).count(),
+        "overdue_returns": Borrowing.objects.filter(status=BorrowingStatus.ACTIVE, due_at__lt=now).count(),
+        "unread_notifications": Notification.objects.filter(is_read=False).count(),
+    }
+
+
 @staff_member_required(login_url="login")
 def dashboard(request):
     now = timezone.now()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    monthly = list(
-        Borrowing.objects.filter(picked_up_at__gte=month_start)
-        .values("picked_up_at__date").annotate(total=Count("id")).order_by("picked_up_at__date")
+    # One query each for unit totals and request statuses instead of a loop of queries.
+    units = Item.objects.filter(is_active=True).aggregate(
+        total=Sum("total_qty"), reserved=Sum("reserved_qty"), borrowed=Sum("borrowed_qty"),
+        repair=Sum("repair_qty"), items=Count("id"),
     )
+    units = {k: v or 0 for k, v in units.items()}
+    by_status = dict(BorrowRequest.objects.values_list("status").annotate(n=Count("id")).values_list("status", "n"))
     return render(request, "admin/dashboard.html", _ctx(
         request, "Dashboard",
-        total_items=Item.objects.filter(is_active=True).count(),
-        pending_requests=BorrowRequest.objects.filter(status=RequestStatus.PENDING).count(),
+        **_badge_counts(now),
+        total_items=units["items"],
         active_borrowings=Borrowing.objects.filter(status=BorrowingStatus.ACTIVE).count(),
-        overdue_returns=Borrowing.objects.filter(status=BorrowingStatus.ACTIVE, due_at__lt=now).count(),
-        available_units=sum(i.available_qty for i in Item.objects.filter(is_active=True)),
-        borrowed_units=sum(i.borrowed_qty for i in Item.objects.filter(is_active=True)),
-        repair_units=sum(i.repair_qty for i in Item.objects.filter(is_active=True)),
-        request_summary=[{"label": label, "count": BorrowRequest.objects.filter(status=value).count()} for value, label in RequestStatus.choices],
+        available_units=max(units["total"] - units["reserved"] - units["borrowed"] - units["repair"], 0),
+        borrowed_units=units["borrowed"],
+        repair_units=units["repair"],
+        request_summary=[{"label": label, "count": by_status.get(value, 0)} for value, label in RequestStatus.choices],
         recent_requests=BorrowRequest.objects.select_related("user", "item")[:5],
         overdue=Borrowing.objects.select_related("user", "item").filter(status=BorrowingStatus.ACTIVE, due_at__lt=now).order_by("due_at")[:5],
-        monthly=monthly,
-        unread_notifications=Notification.objects.filter(is_read=False).count(),
+        trend=analytics.demand_trend(now),
+    ))
+
+
+@staff_member_required(login_url="login")
+def analytics_page(request):
+    now = timezone.now()
+    return render(request, "admin/analytics.html", _ctx(
+        request, "Analytics",
+        **_badge_counts(now),
+        trend=analytics.demand_trend(now),
+        outlook=analytics.stock_outlook(now),
+        top=analytics.top_items(now=now),
+        returns=analytics.return_histogram(now=now),
+        risk=analytics.overdue_risk(now=now),
     ))
 
 
@@ -129,8 +155,12 @@ def item_toggle(request, item_id):
 def requests_list(request):
     q, status = request.GET.get("q", "").strip(), request.GET.get("status", "all")
     qs = BorrowRequest.objects.select_related("user", "item")
-    if q: qs = qs.filter(item__name__icontains=q) | BorrowRequest.objects.select_related("user", "item").filter(user__full_name__icontains=q) | BorrowRequest.objects.select_related("user", "item").filter(request_id__icontains=q)
+    if q: qs = qs.filter(item__name__icontains=q) | BorrowRequest.objects.select_related("user", "item").filter(_name_matches(q, "user__")) | BorrowRequest.objects.select_related("user", "item").filter(request_id__icontains=q)
     if status in RequestStatus.values: qs = qs.filter(status=status)
+    # Requests waiting on staff come first: pending, then reserved for pickup, then the rest.
+    qs = qs.annotate(queue=Case(
+        When(status=RequestStatus.PENDING, then=0), When(status=RequestStatus.APPROVED, then=1), default=2,
+    )).order_by("queue", "-created_at", "-id")
     return render(request, "admin/requests.html", _ctx(request, "Borrowing Requests", requests=qs.distinct(), q=q, status=status, statuses=RequestStatus.choices))
 
 
@@ -154,7 +184,7 @@ def request_action(request, request_id, action):
 def borrowings(request):
     q, status = request.GET.get("q", "").strip(), request.GET.get("status", "all")
     qs = Borrowing.objects.select_related("user", "item", "request")
-    if q: qs = qs.filter(item__name__icontains=q) | Borrowing.objects.select_related("user", "item", "request").filter(user__full_name__icontains=q) | Borrowing.objects.select_related("user", "item", "request").filter(borrowing_id__icontains=q)
+    if q: qs = qs.filter(item__name__icontains=q) | Borrowing.objects.select_related("user", "item", "request").filter(_name_matches(q, "user__")) | Borrowing.objects.select_related("user", "item", "request").filter(borrowing_id__icontains=q)
     if status == "active": qs = qs.filter(status=BorrowingStatus.ACTIVE)
     elif status == "returned":
         qs = qs.filter(status=BorrowingStatus.RETURNED)
@@ -170,7 +200,7 @@ def return_management(request):
     q, status = request.GET.get("q", "").strip(), request.GET.get("status", "all")
     qs = Borrowing.objects.select_related("user", "item", "request")
     if q:
-        qs = qs.filter(item__name__icontains=q) | Borrowing.objects.select_related("user", "item", "request").filter(user__full_name__icontains=q) | Borrowing.objects.select_related("user", "item", "request").filter(borrowing_id__icontains=q)
+        qs = qs.filter(item__name__icontains=q) | Borrowing.objects.select_related("user", "item", "request").filter(_name_matches(q, "user__")) | Borrowing.objects.select_related("user", "item", "request").filter(borrowing_id__icontains=q)
     now = timezone.now()
     if status == "active": qs = qs.filter(status=BorrowingStatus.ACTIVE)
     elif status == "returned": qs = qs.filter(status=BorrowingStatus.RETURNED)
@@ -194,13 +224,127 @@ def return_action(request, borrowing_id):
     return redirect("staff_returns" if request.POST.get("return_to") == "returns" else "staff_borrowings")
 
 
+def _name_matches(q, prefix=""):
+    """A filter for people whose name parts contain every word that was typed."""
+    match = Q()
+    for word in q.split():
+        match &= (
+            Q(**{f"{prefix}first_name__icontains": word})
+            | Q(**{f"{prefix}middle_name__icontains": word})
+            | Q(**{f"{prefix}last_name__icontains": word})
+        )
+    return match
+
+
 @staff_member_required(login_url="login")
 def users(request):
     q, user_type = request.GET.get("q", "").strip(), request.GET.get("type", "all")
-    qs = User.objects.filter(is_superuser=False).order_by("full_name")
-    if q: qs = qs.filter(full_name__icontains=q)
+    qs = User.objects.filter(is_superuser=False).order_by("last_name", "first_name")
+    if q: qs = qs.filter(_name_matches(q))
     if user_type in UserType.values: qs = qs.filter(user_type=user_type)
     return render(request, "admin/users.html", _ctx(request, "User Management", users=qs, q=q, user_type=user_type, user_types=UserType.choices))
+
+
+def _read_user_form(request, user=None):
+    """Return (values, errors) using the same rules as self-registration."""
+    post = request.POST
+    values = {
+        "first_name": names.clean_name_part(post.get("first_name")),
+        "middle_name": names.clean_middle_name(post.get("middle_name")),
+        "last_name": names.clean_name_part(post.get("last_name")),
+        "suffix": names.clean_suffix(post.get("suffix")),
+        "email": v.normalize_email(post.get("email")),
+        "mobile": v.normalize_mobile(post.get("mobile", "")),
+        "user_type": post.get("user_type", ""),
+    }
+    others = User.objects.exclude(pk=user.pk) if user else User.objects.all()
+    errors = []
+    for name, label, required in (("first_name", "First name", True), ("middle_name", "Middle name", False), ("last_name", "Last name", True)):
+        if err := names.check_name_part(values[name], required): errors.append(f"{label}: {err}")
+    if err := names.check_suffix(values["suffix"]): errors.append(f"Suffix: {err}")
+    if err := v.check_email(values["email"]): errors.append(err)
+    elif others.filter(email__iexact=values["email"]).exists(): errors.append("This email is already registered.")
+    if not values["mobile"]: errors.append("Enter a valid Philippine mobile number (+63 9XX XXX XXXX).")
+    elif others.filter(mobile=values["mobile"]).exists(): errors.append("This mobile number is already registered.")
+    if values["user_type"] not in UserType.values: errors.append("Select Student, Faculty or Staff.")
+    return values, errors
+
+
+@staff_member_required(login_url="login")
+def user_new(request):
+    if request.method == "POST":
+        values, errors = _read_user_form(request)
+        if not errors:
+            # No password yet: the person sets one with the reset code sent to this school email,
+            # and adds their school ID the first time they log in.
+            user = User.objects.create_user(password=None, is_email_verified=True, **values)
+            audit(request.user, "account_created", user)
+            try:
+                send_mail(
+                    "Your REUSE account",
+                    f"Hi {user.full_name},\n\nAn administrator created a REUSE account for you. "
+                    f"Set your password here using this email address:\n{settings.SITE_URL}/reset-password/\n\n"
+                    "Have your school ID ready the first time you log in.",
+                    settings.DEFAULT_FROM_EMAIL, [user.email],
+                )
+                messages.success(request, f"{user.full_name} created. They were emailed how to set a password.")
+            except Exception:  # noqa: BLE001
+                messages.warning(request, f"{user.full_name} created, but the email failed. Ask them to use Reset Password.")
+            return redirect("staff_user_detail", user.pk)
+        for error in errors: messages.error(request, error)
+    return render(request, "admin/user_new.html", _ctx(request, "Add User", user_types=UserType.choices, form=request.POST))
+
+
+@staff_member_required(login_url="login")
+def user_detail(request, user_id):
+    user = get_object_or_404(User, pk=user_id, is_superuser=False)
+    if request.method == "POST":
+        values, errors = _read_user_form(request, user)
+        for error in errors: messages.error(request, error)
+        if not errors:
+            for field, value in values.items(): setattr(user, field, value)
+            user.save(update_fields=list(values))
+            audit(request.user, "account_updated", user)
+            messages.success(request, f"{user.full_name} saved.")
+        return redirect("staff_user_detail", user.pk)
+    return render(request, "admin/user_detail.html", _ctx(
+        request, user.full_name, subject=user, user_types=UserType.choices,
+        records=user.verification_records.all()[:20], face_ready=face_login.has_usable_template(user),
+        scans_left=face_login.attempts_left(user), max_scans=settings.FACE_MAX_FAILED_SCANS,
+    ))
+
+
+@staff_member_required(login_url="login")
+def user_delete(request, user_id):
+    if request.method != "POST": return redirect("staff_user_detail", user_id)
+    user = get_object_or_404(User, pk=user_id, is_superuser=False)
+    if user.pk == request.user.pk:
+        messages.error(request, "You cannot delete your own account here.")
+    elif user.requests.exists() or user.borrowings.exists():
+        # Borrowing records must survive, so these accounts can only be deactivated.
+        messages.error(request, "This account has borrowing history. Deactivate it instead.")
+    else:
+        name = user.full_name
+        registration.discard_id_images(user)
+        if user.profile_image: user.profile_image.delete(save=False)
+        audit(request.user, "account_deleted", user)
+        user.delete()  # the face template and the verification log go with the account
+        messages.success(request, f"{name} deleted.")
+        return redirect("staff_users")
+    return redirect("staff_user_detail", user_id)
+
+
+@staff_member_required(login_url="login")
+def user_face_reset(request, user_id):
+    """Forget the person's face template. They add their school ID again the next time they log in."""
+    if request.method == "POST":
+        user = get_object_or_404(User, pk=user_id, is_superuser=False)
+        registration.discard_id_images(user)
+        user.face_template, user.face_model, user.face_enrolled_at = None, "", None
+        user.save(update_fields=["face_template", "face_model", "face_enrolled_at"])
+        audit(request.user, "face_reset", user)
+        messages.success(request, f"{user.full_name} will be asked for their school ID at their next login.")
+    return redirect("staff_user_detail", user_id)
 
 
 @staff_member_required(login_url="login")

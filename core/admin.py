@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 
 from .models import (
-    AuditLog, Borrowing, BorrowRequest, Delivery, Item, ItemSubscription, Notification, User,
+    AuditLog, Borrowing, BorrowRequest, Delivery, Item, ItemSubscription, Notification, User, VerificationRecord,
 )
 from .security import invalidate_user_sessions
 from .services import (
@@ -18,7 +18,7 @@ from .services import (
 class UserCreateForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = ("email", "full_name", "mobile", "user_type")
+        fields = ("email", "first_name", "middle_name", "last_name", "suffix", "mobile", "user_type")
 
 
 class UserEditForm(UserChangeForm):
@@ -34,15 +34,23 @@ class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
     list_display = ("email", "full_name", "user_type", "is_email_verified", "is_active")
     list_filter = ("user_type", "is_email_verified", "is_active", "is_staff")
-    search_fields = ("email", "full_name", "mobile")
+    search_fields = ("email", "first_name", "last_name", "mobile", "student_id_number")
+    readonly_fields = ("face_model", "face_enrolled_at", "consent_at")
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Profile", {"fields": ("full_name", "mobile", "user_type", "is_email_verified", "notify_email", "notify_sms")}),
+        ("Name", {"fields": ("first_name", "middle_name", "last_name", "suffix")}),
+        ("Profile", {"fields": ("mobile", "user_type", "is_email_verified", "notify_email", "notify_sms")}),
+        ("From the school ID", {"fields": (
+            "student_id_number", "program", "year_level", "college", "date_of_birth", "sex", "address", "id_valid_until",
+        )}),
+        ("Face login", {"fields": ("face_model", "face_enrolled_at", "consent_at")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         ("Dates", {"fields": ("last_login", "date_joined")}),
     )
     add_fieldsets = (
-        (None, {"classes": ("wide",), "fields": ("email", "full_name", "mobile", "user_type", "password1", "password2")}),
+        (None, {"classes": ("wide",), "fields": (
+            "email", "first_name", "middle_name", "last_name", "suffix", "mobile", "user_type", "password1", "password2",
+        )}),
     )
     actions = ["deactivate_accounts", "reactivate_accounts"]
 
@@ -115,7 +123,7 @@ def _run(modeladmin, request, queryset, fn, success, *extra):
 class BorrowRequestAdmin(admin.ModelAdmin):
     list_display = ("request_id", "user", "item", "quantity", "borrow_at", "return_at", "status", "approval_id")
     list_filter = ("status", "item__category")
-    search_fields = ("request_id", "approval_id", "user__email", "user__full_name", "item__name")
+    search_fields = ("request_id", "approval_id", "user__email", "user__first_name", "user__last_name", "item__name")
     readonly_fields = ("request_id", "approval_id", "user", "item", "quantity", "borrow_at", "return_at",
                        "reason", "reason_other", "details", "status", "approved_at", "canceled_at")
     actions = ["approve", "reject", "cancel_reservation", "confirm_pickup_action"]
@@ -181,6 +189,13 @@ class AuditLogAdmin(ReadOnlyAdmin):
     list_display = ("created_at", "actor", "action", "target_type", "target_id")
     list_filter = ("action", "target_type")
     search_fields = ("target_id", "actor__email")
+
+
+@admin.register(VerificationRecord)
+class VerificationRecordAdmin(ReadOnlyAdmin):
+    list_display = ("created_at", "user", "kind", "outcome", "similarity", "ip")
+    list_filter = ("kind", "outcome")
+    search_fields = ("user__email", "ip")
 
 
 class DeliveryInline(admin.TabularInline):

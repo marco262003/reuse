@@ -1,0 +1,38 @@
+{% comment %}One registration field, drawn from core/registration_fields.py (f is a Field).{% endcomment %}
+{% if f.kind == "password" %}
+{% include "partials/password_field.html" with name=f.name placeholder=f.label autocomplete=f.autocomplete %}
+{% elif f.kind == "checkbox" %}
+<div class="field consent" data-field="{{ f.name }}">
+  <label for="{{ f.name }}">
+    <input type="checkbox" id="{{ f.name }}" name="{{ f.name }}" aria-describedby="{{ f.name }}-error">
+    <span>{% include "partials/consent_text.html" %}</span>
+  </label>
+  <p class="field-error" id="{{ f.name }}-error"></p>
+</div>
+{% elif f.name == "mobile" %}
+<div class="field" data-field="mobile">
+  <label class="input-label" for="mobile">{{ f.label }}</label>
+  <div class="input-wrap">
+    <span class="phone-prefix" aria-hidden="true">+63</span>
+    <input class="input has-prefix" id="mobile" name="mobile" type="tel" inputmode="numeric" maxlength="13"
+           aria-describedby="mobile-error" autocomplete="{{ f.autocomplete }}">
+  </div>
+  <p class="field-error" id="mobile-error"></p>
+</div>
+{% elif f.kind == "select" %}
+<div class="field" data-field="{{ f.name }}">
+  <label class="input-label" for="{{ f.name }}">{{ f.label }}</label>
+  <select class="input" id="{{ f.name }}" name="{{ f.name }}" aria-describedby="{{ f.name }}-error">
+    <option value="" selected>{% if f.required or f.required_for %}Select one{% else %}Not set{% endif %}</option>
+    {% for value, label in f.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+  </select>
+  <p class="field-error" id="{{ f.name }}-error"></p>
+</div>
+{% else %}
+<div class="field" data-field="{{ f.name }}">
+  <label class="input-label" for="{{ f.name }}">{{ f.label }}</label>
+  <input class="input" id="{{ f.name }}" name="{{ f.name }}" type="{{ f.kind }}"{% if f.max_length %} maxlength="{{ f.max_length }}"{% endif %}
+         aria-describedby="{{ f.name }}-error" autocomplete="{{ f.autocomplete }}">
+  <p class="field-error" id="{{ f.name }}-error"></p>
+</div>
+{% endif %}

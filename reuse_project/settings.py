@@ -7,6 +7,7 @@ Local development values are loaded from the .env file.
 """
 
 import os
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,7 +43,13 @@ SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "dev-only-secret-change-me",
 )
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+# Off unless DJANGO_DEBUG=1 is set (the local .env sets it), so a missing .env is never an insecure server.
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
+
+if not DEBUG and SECRET_KEY == "dev-only-secret-change-me":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY in .env (or the environment) when DJANGO_DEBUG is not 1.")
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -71,6 +78,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "anymail",
     "core",
 ]
 
@@ -142,6 +150,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Password rules are enforced by core.validators.
 AUTH_PASSWORD_VALIDATORS = []
 
+# New passwords are hashed with Argon2. Older PBKDF2 hashes still work and are
+# re-hashed with Argon2 the next time their owner logs in.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+if "test" in sys.argv:
+    # Hashing speed is not what the tests check; one test switches the real hashers back on.
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
 
 # --- Language and time --------------------------------------------------------
 LANGUAGE_CODE = "en-us"
@@ -154,6 +172,10 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "core.storage.VersionedStaticStorage"},
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -162,7 +184,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # --- Sessions and CSRF ---------------------------------------------------------
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_AGE = 60 * 60 * 8
+# SESSION_COOKIE_AGE is set in registration_config.py with the other sign-in timings.
 
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -185,7 +207,14 @@ DEFAULT_FROM_EMAIL = os.environ.get(
     "REUSE <no-reply@reuse.local>",
 )
 
-if os.environ.get("EMAIL_HOST"):
+if os.environ.get("MAILJET_API_KEY"):
+    # Mailjet over HTTPS (port 443): works on networks that block the email ports.
+    EMAIL_BACKEND = "anymail.backends.mailjet.EmailBackend"
+    ANYMAIL = {
+        "MAILJET_API_KEY": os.environ["MAILJET_API_KEY"],
+        "MAILJET_SECRET_KEY": os.environ.get("MAILJET_SECRET_KEY", ""),
+    }
+elif os.environ.get("EMAIL_HOST"):
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = os.environ["EMAIL_HOST"]
     EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
@@ -198,9 +227,17 @@ else:
 
 
 # --- SMS ----------------------------------------------------------------------
-# SMS requires a configured provider and API integration.
-SMS_API_KEY = os.environ.get("SMS_API_KEY", "")
-SMS_SENDER_NAME = os.environ.get("SMS_SENDER_NAME", "")
+# SMS goes through textbee.dev (an Android phone with a SIM sends the messages).
+# Without TEXTBEE_API_KEY, SMS deliveries are recorded as skipped, never as sent.
+TEXTBEE_API_KEY = os.environ.get("TEXTBEE_API_KEY", "")
+TEXTBEE_DEVICE_ID = os.environ.get("TEXTBEE_DEVICE_ID", "")  # optional; default device if empty
+TEXTBEE_BASE_URL = os.environ.get("TEXTBEE_BASE_URL", "https://api.textbee.dev/api/v1")
+
+
+# --- ID-first registration and face login ------------------------------------------
+# Every tunable value (thresholds, retries, file limits, session lengths, ID templates)
+# lives in registration_config.py.
+from .registration_config import *  # noqa: E402,F401,F403
 
 
 # --- REUSE business rules -----------------------------------------------------

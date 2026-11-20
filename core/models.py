@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -39,8 +41,12 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
-    full_name = models.CharField(max_length=150)
-    mobile = models.CharField(max_length=13, unique=True, null=True, blank=True)  # stored as +639XXXXXXXXX
+    # The name is kept as separate parts, never as one string.
+    first_name = models.CharField(max_length=60)
+    middle_name = models.CharField(max_length=60, blank=True)
+    last_name = models.CharField(max_length=60)
+    suffix = models.CharField(max_length=10, blank=True)
+    mobile =models.CharField(max_length=13, unique=True, null=True, blank=True)  # stored as +639XXXXXXXXX
     user_type = models.CharField(max_length=10, choices=UserType.choices, default=UserType.STUDENT)
 
     is_active = models.BooleanField(default=True)  # False = deactivated by an admin
@@ -53,27 +59,38 @@ class User(AbstractBaseUser, PermissionsMixin):
     notify_sms = models.BooleanField(default=True)
 
     date_joined = models.DateTimeField(default=timezone.now)
-    identity_verification_status = models.CharField(
-        max_length=20,
-        default="not_started",
-    )
 
-    identity_verified = models.BooleanField(default=False)
+    # Read from the school ID at registration; the person can correct any of them.
+    student_id_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    program = models.CharField(max_length=120, blank=True)
+    year_level = models.CharField(max_length=20, blank=True)
+    sex = models.CharField(max_length=10, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    college = models.CharField(max_length=120, blank=True)
+    id_valid_until = models.CharField(max_length=30, blank=True)
+
+    # Face login. The template is an encrypted list of numbers made from the ID portrait, not a photo.
+    face_template = models.BinaryField(null=True, blank=True, editable=False)
+    face_model = models.CharField(max_length=40, blank=True)
+    face_enrolled_at = models.DateTimeField(null=True, blank=True)
+    consent_at = models.DateTimeField(null=True, blank=True)  # agreed to ID and face processing
 
     objects = UserManager()
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["full_name"]
+    REQUIRED_FIELDS = ["first_name", "last_name"]
 
     def __str__(self):
         return self.email
 
     @property
+    def full_name(self):
+        return " ".join(part for part in (self.first_name, self.middle_name, self.last_name, self.suffix) if part)
+
+    @property
     def short_name(self):
-        parts = self.full_name.split()
-        if len(parts) <= 2:
-            return self.full_name
-        return f"{parts[0]} {parts[-1]}"
+        return f"{self.first_name} {self.last_name}".strip()
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +303,7 @@ class NotificationType(models.TextChoices):
     DUE_SOON = "due_soon", "Due soon"
     OVERDUE = "overdue", "Overdue"
     RETURN_CONFIRMED = "return_confirmed", "Return confirmed"
+    SIGN_IN_ALERT = "sign_in_alert", "Sign-in alert"
 
 
 class Notification(models.Model):
@@ -341,6 +359,8 @@ class Delivery(models.Model):
 class PasswordResetCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reset_codes")
     channel = models.CharField(max_length=5, choices=[("email", "Email"), ("sms", "SMS")])
+    # "login" codes finish a sign-in when the face scan could not; they never reset a password.
+    purpose = models.CharField(max_length=5, choices=[("reset", "Password reset"), ("login", "Sign-in")], default="reset")
     code_hash = models.CharField(max_length=64)
     created_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField()
@@ -364,3 +384,89 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.created_at:%Y-%m-%d %H:%M} {self.action} {self.target_type}#{self.target_id}"
+
+
+# ---------------------------------------------------------------------------
+# ID-first registration and face login
+# ---------------------------------------------------------------------------
+class RegistrationDraft(models.Model):
+    """A sign-up in progress. Its id lives in the visitor's session and authorises the ID calls."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    uploads = models.PositiveSmallIntegerField(default=0)
+    extractions = models.PositiveSmallIntegerField(default=0)
+    # Held here until the account exists.
+    face_template = models.BinaryField(null=True, blank=True, editable=False)
+    face_model = models.CharField(max_length=40, blank=True)
+
+
+class IDSide(models.TextChoices):
+    FRONT = "front", "Front"
+    BACK = "back", "Back"
+
+
+class IDDocument(models.Model):
+    """What we know about an uploaded school ID image. The image itself lives in object storage."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    draft = models.ForeignKey(RegistrationDraft, null=True, blank=True, on_delete=models.CASCADE, related_name="documents")
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name="id_documents")
+    side = models.CharField(max_length=5, choices=IDSide.choices)
+    storage_key = models.CharField(max_length=200)
+    content_type = models.CharField(max_length=30)
+    size_bytes = models.PositiveIntegerField(default=0)
+    sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    raw_name = models.TextField(blank=True)  # the name exactly as OCR read it, for audit
+    name_format = models.CharField(max_length=10, blank=True)
+    field_confidence = models.JSONField(default=dict, blank=True)  # field name -> confidence, no values
+    face_found = models.BooleanField(default=False)
+    ocr_engine = models.CharField(max_length=40, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    image_deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sha256"], condition=Q(user__isnull=False, side="front"), name="one_account_per_id_image",
+            )
+        ]
+
+
+class VerificationKind(models.TextChoices):
+    ID_EXTRACT = "id_extract", "ID read"
+    FACE_LOGIN = "face_login", "Face scan"
+    EMAIL_CODE = "email_code", "Email code"
+
+
+class VerificationOutcome(models.TextChoices):
+    SUCCESS = "success", "Success"
+    NO_MATCH = "no_match", "Face did not match"
+    LIVENESS_FAILED = "liveness_failed", "Liveness check failed"
+    NO_FACE = "no_face", "No face found"
+    MULTIPLE_FACES = "multiple_faces", "More than one face"
+    BAD_FILE = "bad_file", "Unusable file"
+    DUPLICATE = "duplicate", "ID already registered"
+    WRONG_CODE = "wrong_code", "Wrong code"
+    ERROR = "error", "Error"
+
+
+class VerificationRecord(models.Model):
+    """Audit log of ID checks and face logins. It never holds images or face templates."""
+
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name="verification_records")
+    draft_id = models.UUIDField(null=True, blank=True)
+    kind = models.CharField(max_length=10, choices=VerificationKind.choices)
+    outcome = models.CharField(max_length=15, choices=VerificationOutcome.choices)
+    similarity = models.FloatField(null=True, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["user", "kind", "created_at"])]
+
+    def __str__(self):
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.kind} {self.outcome}"
